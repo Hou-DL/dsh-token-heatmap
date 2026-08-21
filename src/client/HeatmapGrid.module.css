@@ -1,0 +1,35 @@
+.grid {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.cell {
+  width: 12px;
+  height: 12px;
+  border-radius: 2px;
+  box-sizing: border-box;
+}
+
+.legend {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  justify-content: flex-end;
+  font-size: 12px;
+  color: var(--dsw-alias-label-tertiary);
+}
+
+.switcher {
+  display: inline-flex;
+  border: 1px solid var(--dsw-alias-border-l2);
+  border-radius: 8px;
+  overflow: hidden;
+  background: var(--dsw-alias-bg-layer-3);
+}
+
+.switcher button[aria-selected="true"] {
+  background: var(--dsw-alias-label-primary);
+  color: var(--dsw-alias-bg-layer-3);
+  font-weight: 600;
+}
