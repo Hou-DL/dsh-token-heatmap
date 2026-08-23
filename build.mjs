@@ -6,6 +6,9 @@ const shared = {
   platform: "node",
   target: "node22",
   sourcemap: true,
+  // Rewrite `./x.ts` relative imports to `./x.js` so Node can resolve them
+  // from the emitted ESM output (bundle:false preserves the module graph).
+  rewriteRelativeImportExtensions: true,
 };
 
 await build({

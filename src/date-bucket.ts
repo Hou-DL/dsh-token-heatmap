@@ -66,13 +66,9 @@ export function monthRangeFor(dateKey: string): [string, string] {
   return [s, `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(lastDay).padStart(2, "0")}`];
 }
 
+/** Last ~90 days: sliding window for the "Quarter" tab (not calendar quarter). */
 export function quarterRangeFor(dateKey: string): [string, string] {
-  const s = quarterStartOf(dateKey);
-  const sd = dayKeyToDate(s);
-  const q = Math.floor(sd.getMonth() / 3);
-  const endMonth = q * 3 + 3; // 1-indexed
-  const lastDay = new Date(sd.getFullYear(), endMonth, 0).getDate();
-  return [s, `${sd.getFullYear()}-${String(endMonth).padStart(2, "0")}-${String(lastDay).padStart(2, "0")}`];
+  return [addDays(dateKey, -89), dateKey];
 }
 
 export function yearRangeFor(dateKey: string): [string, string] {

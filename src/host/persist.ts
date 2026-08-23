@@ -13,6 +13,7 @@ export type PersistedDay = {
   count: number;
   byModel: Record<string, number>;
   byProvider: Record<string, number>;
+  hourlyTokens: number[];
   winnerModel: string | null;
   winnerProvider: string | null;
 };
@@ -23,10 +24,28 @@ export type PersistedFile = {
 };
 
 function persistPath(): string {
-  // Use ~/.dsh/storages for global persistence (survives session deletion)
-  // This directory already exists in every DSH install
   const dir = join(homedir(), ".dsh", "storages", "dsh-token-heatmap");
   return join(dir, "daily.json");
+}
+
+function libDailyPath(): string | null {
+  try {
+    // Host writes a second copy to the installed plugin's lib/ so browser can fetch via /plugins/dsh-token-heatmap/daily.json
+    const candidates = [
+      join(homedir(), ".dsh", "profiles", "web", "node_modules", "dsh-token-heatmap", "lib", "daily.json"),
+      join("/home/dell/testdsh/dsh-token-heatmap/lib/daily.json"),
+    ];
+    for (const c of candidates) {
+      try {
+        mkdirSync(dirname(c), { recursive: true });
+        // probe writable by touching
+        return c;
+      } catch {}
+    }
+    return candidates[0];
+  } catch {
+    return null;
+  }
 }
 
 function toPersistedDay(day: DayAgg): PersistedDay {
@@ -40,6 +59,7 @@ function toPersistedDay(day: DayAgg): PersistedDay {
     count: day.count,
     byModel: Object.fromEntries(day.byModel),
     byProvider: Object.fromEntries(day.byProvider),
+    hourlyTokens: [...(day.hourlyTokens ?? new Array(24).fill(0))],
     winnerModel: day.winnerModel,
     winnerProvider: day.winnerProvider,
   };
@@ -48,6 +68,9 @@ function toPersistedDay(day: DayAgg): PersistedDay {
 function fromPersistedDay(p: PersistedDay): DayAgg {
   const byModel = new Map<string, number>(Object.entries(p.byModel ?? {}));
   const byProvider = new Map<string, number>(Object.entries(p.byProvider ?? {}));
+  const hourlyTokens = Array.isArray((p as any).hourlyTokens) && (p as any).hourlyTokens.length === 24
+    ? [...(p as any).hourlyTokens]
+    : new Array(24).fill(0);
   return {
     dayKey: p.dayKey,
     totalTokens: p.totalTokens,
@@ -58,6 +81,7 @@ function fromPersistedDay(p: PersistedDay): DayAgg {
     count: p.count ?? 0,
     byModel,
     byProvider,
+    hourlyTokens,
     winnerModel: p.winnerModel ?? null,
     winnerProvider: p.winnerProvider ?? null,
   };
@@ -86,15 +110,28 @@ export function loadPersisted(): Map<string, DayAgg> {
 
 export function savePersisted(days: Map<string, DayAgg>): void {
   try {
-    const p = persistPath();
-    mkdirSync(dirname(p), { recursive: true });
     const out: PersistedFile = {
       version: 1,
       days: Object.fromEntries([...days.entries()].map(([k, v]) => [k, toPersistedDay(v)])),
     };
+    const json = JSON.stringify(out, null, 2);
+    const p = persistPath();
+    mkdirSync(dirname(p), { recursive: true });
     const tmp = p + ".tmp";
-    writeFileSync(tmp, JSON.stringify(out, null, 2), "utf-8");
+    writeFileSync(tmp, json, "utf-8");
     renameSync(tmp, p);
+    // Also write to lib/ for browser fetch via /plugins/dsh-token-heatmap/daily.json
+    const libPath = libDailyPath();
+    if (libPath) {
+      try {
+        writeFileSync(libPath, json, "utf-8");
+      } catch {}
+      // Also try the workspace copy for dev
+      try {
+        const wsLib = join("/home/dell/testdsh/dsh-token-heatmap/lib/daily.json");
+        if (wsLib !== libPath) writeFileSync(wsLib, json, "utf-8");
+      } catch {}
+    }
   } catch {
     // best-effort
   }
@@ -123,7 +160,8 @@ export function mergePersistedAndLive(
       result.set(k, cloneDay(liveDay));
       continue;
     }
-    // Take max for scalar totals (never shrink)
+    // Take max for scalar totals (never shrink); hourly also max per hour
+    const mergedHourly = (prev.hourlyTokens ?? new Array(24).fill(0)).map((v, i) => Math.max(v, liveDay.hourlyTokens?.[i] ?? 0));
     const merged: DayAgg = {
       dayKey: k,
       totalTokens: Math.max(prev.totalTokens, liveDay.totalTokens),
@@ -134,6 +172,7 @@ export function mergePersistedAndLive(
       count: Math.max(prev.count, liveDay.count),
       byModel: mergeMapMax(prev.byModel, liveDay.byModel),
       byProvider: mergeMapMax(prev.byProvider, liveDay.byProvider),
+      hourlyTokens: mergedHourly,
       winnerModel: null,
       winnerProvider: null,
     };
@@ -173,6 +212,7 @@ function cloneDay(d: DayAgg): DayAgg {
     count: d.count,
     byModel: new Map(d.byModel),
     byProvider: new Map(d.byProvider),
+    hourlyTokens: [...(d.hourlyTokens ?? new Array(24).fill(0))],
     winnerModel: d.winnerModel,
     winnerProvider: d.winnerProvider,
   };

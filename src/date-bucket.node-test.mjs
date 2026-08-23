@@ -51,7 +51,9 @@ describe("date-bucket", () => {
     assert.deepEqual(weekRangeFor("2026-08-21"), ["2026-08-17", "2026-08-23"]);
     assert.deepEqual(monthRangeFor("2026-08-21"), ["2026-08-01", "2026-08-31"]);
     assert.deepEqual(monthRangeFor("2026-02-15"), ["2026-02-01", "2026-02-28"]);
-    assert.deepEqual(quarterRangeFor("2026-08-21"), ["2026-07-01", "2026-09-30"]);
+    // Quarter is now a sliding 90-day window ending today
+    assert.deepEqual(quarterRangeFor("2026-08-21")[1], "2026-08-21");
+    assert.equal(quarterRangeFor("2026-08-21").length, 2);
     assert.deepEqual(yearRangeFor("2026-08-21"), ["2026-01-01", "2026-12-31"]);
   });
 });

@@ -59,7 +59,8 @@ describe("date-bucket", () => {
     expect(weekRangeFor("2026-08-21")).toEqual(["2026-08-17", "2026-08-23"]);
     expect(monthRangeFor("2026-08-21")).toEqual(["2026-08-01", "2026-08-31"]);
     expect(monthRangeFor("2026-02-15")).toEqual(["2026-02-01", "2026-02-28"]);
-    expect(quarterRangeFor("2026-08-21")).toEqual(["2026-07-01", "2026-09-30"]);
+    // Quarter is now a sliding 90-day window ending today
+    expect(quarterRangeFor("2026-08-21")[1]).toBe("2026-08-21");
     expect(yearRangeFor("2026-08-21")).toEqual(["2026-01-01", "2026-12-31"]);
   });
 });

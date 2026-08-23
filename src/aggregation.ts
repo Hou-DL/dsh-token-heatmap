@@ -30,6 +30,8 @@ export type DayAgg = {
   count: number;
   byModel: Map<string, number>;
   byProvider: Map<string, number>;
+  /** 24 hourly buckets in Asia/Shanghai, index 0 = 00:00-01:00 */
+  hourlyTokens: number[];
   winnerModel: string | null;
   winnerProvider: string | null;
 };
@@ -62,6 +64,7 @@ function emptyDay(dayKey: string): DayAgg {
     count: 0,
     byModel: new Map(),
     byProvider: new Map(),
+    hourlyTokens: new Array(24).fill(0),
     winnerModel: null,
     winnerProvider: null,
   };
@@ -79,12 +82,35 @@ function resolveRange(byDay: Map<string, DayAgg>, start: string, end: string): D
   return listDaysInRange(start, end).map((k) => resolveDay(byDay, k));
 }
 
+/**
+ * 5-level fallback for callers without a view-aware max (e.g. legacy tests).
+ * For view-aware quantile, use levelForView().
+ */
 export function clampLevel(value: number): 0 | 1 | 2 | 3 | 4 {
   if (value === 0) return 0;
   if (value <= 2000) return 1;
   if (value <= 10000) return 2;
   if (value <= 50000) return 3;
   return 4;
+}
+
+/** View-aware quantile: 0, (0,25%], (25%,50%], (50%,75%], (75%,100%] so month/quarter spread across the palette. */
+export function levelForView(value: number, viewMax: number): 0 | 1 | 2 | 3 | 4 {
+  if (value === 0) return 0;
+  if (viewMax <= 0) return 1;
+  const r = value / viewMax;
+  if (r <= 0.25) return 1;
+  if (r <= 0.5) return 2;
+  if (r <= 0.75) return 3;
+  return 4;
+}
+
+function hourInShanghai(ms: number): number {
+  // Convert to Asia/Shanghai hour 0-23. en-GB is used because en-US may emit
+  // "24" for midnight on some ICU data; we also defensively clamp.
+  const s = new Date(ms).toLocaleString("en-GB", { timeZone: "Asia/Shanghai", hour: "2-digit", hour12: false });
+  const h = Number(s);
+  return h === 24 ? 0 : h;
 }
 
 export function aggregate(events: RawUsageEvent[], nowMs: number): Aggregated {
@@ -107,6 +133,8 @@ export function aggregate(events: RawUsageEvent[], nowMs: number): Aggregated {
     agg.cacheWriteTokens += u.cacheWriteTokens ?? 0;
     agg.outputTokens += u.outputTokens ?? 0;
     agg.count += 1;
+    const h = hourInShanghai(ev.time);
+    if (h >= 0 && h < 24) agg.hourlyTokens[h] += total;
 
     const modelKey = ev.model || "unknown";
     const providerKey = ev.provider || "unknown";

@@ -2,7 +2,6 @@ import * as React from "react";
 import { aggregate, type Aggregated, type DayAgg } from "../aggregation.ts";
 import { toDayKey } from "../date-bucket.ts";
 
-// Settings key for auto-refresh interval (minutes), stored in localStorage as fallback
 const LS_INTERVAL_KEY = "dsh-token-heatmap:autoRefreshMinutes";
 
 export function getAutoRefreshMinutes(): number {
@@ -23,12 +22,75 @@ export function setAutoRefreshMinutes(minutes: number) {
   } catch {}
 }
 
+const API_TIMEOUT_MS = 5000;
+
+async function fetchFromApi(): Promise<Aggregated | null> {
+  const ctrl = new AbortController();
+  const timer = setTimeout(() => ctrl.abort(), API_TIMEOUT_MS);
+  try {
+    const res = await fetch("/api/dsh-token-heatmap/daily.json", { cache: "no-store", signal: ctrl.signal });
+    if (!res.ok) return null;
+    const json = await res.json();
+    if (!json || !Array.isArray(json.days)) return null;
+    const byDay = new Map<string, DayAgg>();
+    for (const d of json.days) {
+      byDay.set(d.dayKey, {
+        dayKey: d.dayKey,
+        totalTokens: d.totalTokens ?? 0,
+        uncachedInputTokens: d.uncachedInputTokens ?? 0,
+        cacheReadTokens: d.cacheReadTokens ?? 0,
+        cacheWriteTokens: d.cacheWriteTokens ?? 0,
+        outputTokens: d.outputTokens ?? 0,
+        count: d.count ?? 0,
+        byModel: new Map(Object.entries(d.byModel ?? {})) as Map<string, number>,
+        byProvider: new Map(Object.entries(d.byProvider ?? {})) as Map<string, number>,
+        hourlyTokens: Array.isArray(d.hourlyTokens) && d.hourlyTokens.length === 24 ? d.hourlyTokens : new Array(24).fill(0),
+        winnerModel: d.winnerModel ?? null,
+        winnerProvider: d.winnerProvider ?? null,
+      });
+    }
+    const totals = json.totals ?? { today: 0, thisWeek: 0, thisMonth: 0, all: 0 };
+    const topModels = Array.isArray(json.topModels) ? json.topModels.map((x: any) => ({ model: x.name ?? x.model, tokens: x.tokens })) : [];
+    const topProviders = Array.isArray(json.topProviders) ? json.topProviders.map((x: any) => ({ provider: x.name ?? x.provider, tokens: x.tokens })) : [];
+    const nowMs = Date.now();
+    // Reuse aggregation helpers by building a synthetic Aggregated that delegates to byDay
+    const fakeAgg = aggregate([], nowMs);
+    (fakeAgg as any).byDay = byDay;
+    (fakeAgg as any).totals = totals;
+    (fakeAgg as any).topModels = topModels;
+    (fakeAgg as any).topProviders = topProviders;
+    (fakeAgg as any).top5 = topModels;
+    // Patch window helpers to use our byDay
+    const { weekRangeFor, monthRangeFor, quarterRangeFor, yearRangeFor, listDaysInRange } = await import("../date-bucket.ts");
+    const resolveDay = (k: string) => byDay.get(k) ?? { dayKey: k, totalTokens: 0, uncachedInputTokens: 0, cacheReadTokens: 0, cacheWriteTokens: 0, outputTokens: 0, count: 0, byModel: new Map(), byProvider: new Map(), hourlyTokens: new Array(24).fill(0), winnerModel: null, winnerProvider: null };
+    const resolveRange = (s: string, e: string) => listDaysInRange(s, e).map(resolveDay);
+    (fakeAgg as any).weekDays = (k: string) => resolveRange(...weekRangeFor(k));
+    (fakeAgg as any).monthDays = (k: string) => resolveRange(...monthRangeFor(k));
+    (fakeAgg as any).quarterDays = (k: string) => resolveRange(...quarterRangeFor(k));
+    (fakeAgg as any).yearDays = (k: string) => resolveRange(...yearRangeFor(k));
+    (fakeAgg as any).top5InWindow = (days: DayAgg[]) => {
+      const m = new Map<string, number>();
+      for (const d of days) for (const [model, tokens] of d.byModel) m.set(model, (m.get(model) ?? 0) + tokens);
+      return [...m.entries()].sort((a, b) => b[1] - a[1]).slice(0, 5).map(([model, tokens]) => ({ model, tokens }));
+    };
+    (fakeAgg as any).topProvidersInWindow = (days: DayAgg[]) => {
+      const m = new Map<string, number>();
+      for (const d of days) for (const [provider, tokens] of d.byProvider) m.set(provider, (m.get(provider) ?? 0) + tokens);
+      return [...m.entries()].sort((a, b) => b[1] - a[1]).slice(0, 5).map(([provider, tokens]) => ({ provider, tokens }));
+    };
+    return fakeAgg as Aggregated;
+  } catch {
+    return null;
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
 export function useHeatmapData(ctx: any | null, refreshMs?: number, manualTick?: number) {
   const [data, setData] = React.useState<Aggregated | null>(null);
   const [refreshing, setRefreshing] = React.useState(false);
   const [lastRefresh, setLastRefresh] = React.useState<string | null>(null);
 
-  // Determine interval: explicit refreshMs wins, otherwise use stored pref (default 10 min)
   const intervalMs = React.useMemo(() => {
     if (refreshMs !== undefined) return refreshMs;
     const mins = getAutoRefreshMinutes();
@@ -38,10 +100,14 @@ export function useHeatmapData(ctx: any | null, refreshMs?: number, manualTick?:
   const fetchData = React.useCallback(async () => {
     setRefreshing(true);
     try {
-      const store = ctx?.get?.("heatmapStore") ?? (typeof window !== "undefined" ? (window as any).__dsh_heatmapStore : null);
-      if (store?.refresh) {
-        await store.refresh();
+      const apiData = await fetchFromApi();
+      if (apiData) {
+        setData(apiData);
+        setLastRefresh(new Date().toLocaleString());
+        return;
       }
+      const store = ctx?.get?.("heatmapStore") ?? (typeof window !== "undefined" ? (window as any).__dsh_heatmapStore : null);
+      if (store?.refresh) await store.refresh();
       if (store?.getAggregated) {
         setData(store.getAggregated());
         setLastRefresh(new Date().toLocaleString());
@@ -58,16 +124,13 @@ export function useHeatmapData(ctx: any | null, refreshMs?: number, manualTick?:
     } finally {
       setRefreshing(false);
     }
-    // fallback empty
     setData((prev) => prev ?? aggregate([], Date.now()));
   }, [ctx]);
 
-  // Initial fetch + manual tick trigger
   React.useEffect(() => {
     fetchData();
   }, [fetchData, manualTick]);
 
-  // Auto-refresh timer (0 = disabled)
   React.useEffect(() => {
     if (intervalMs === 0) return;
     const id = setInterval(fetchData, intervalMs);

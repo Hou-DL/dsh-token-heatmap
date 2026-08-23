@@ -45,7 +45,7 @@ describe("aggregation", () => {
     const month = a.monthDays("2026-08-15");
     assert.equal(month.length, 31);
     const quarter = a.quarterDays("2026-08-15");
-    assert.equal(quarter.length, 92);
+    assert.equal(quarter.length, 90); // sliding 90-day window
     const year = a.yearDays("2026-08-15");
     assert.equal(year.length, 365);
   });
@@ -71,5 +71,31 @@ describe("aggregation", () => {
     const topWeek = a.top5InWindow(week);
     assert.equal(topWeek.find((x) => x.model === "C"), undefined);
     assert.equal(topWeek[0].model, "B");
+  });
+});
+
+describe("hourly bucketing", () => {
+  test("midnight hour lands in bucket 0 (not 24)", () => {
+    const now = Date.UTC(2026, 7, 21, 10, 0, 0);
+    // 2026-08-21 00:30 Shanghai = 2026-08-20 16:30 UTC
+    const events = [
+      { time: Date.UTC(2026, 7, 20, 16, 30, 0), provider: "p", model: "M", usage: { inputTokens: 100, cacheReadTokens: 0, cacheWriteTokens: 0, outputTokens: 0 } },
+    ];
+    const a = aggregate(events, now);
+    const day = a.byDay.get("2026-08-21");
+    assert.ok(day, "event should land on 2026-08-21 (Shanghai)");
+    assert.equal(day.hourlyTokens[0], 100, "midnight CST should increment hour 0");
+    assert.equal(day.hourlyTokens.reduce((s, v) => s + v, 0), 100, "no tokens lost to hour 24");
+  });
+
+  test("23:59 lands in bucket 23", () => {
+    const now = Date.UTC(2026, 7, 21, 10, 0, 0);
+    const events = [
+      { time: Date.UTC(2026, 7, 21, 15, 59, 0), provider: "p", model: "M", usage: { inputTokens: 42, cacheReadTokens: 0, cacheWriteTokens: 0, outputTokens: 0 } },
+    ];
+    const a = aggregate(events, now);
+    const day = a.byDay.get("2026-08-21");
+    assert.ok(day);
+    assert.equal(day.hourlyTokens[23], 42);
   });
 });

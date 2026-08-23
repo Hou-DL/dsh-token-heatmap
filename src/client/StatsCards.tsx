@@ -7,10 +7,10 @@ export type Totals = {
   all: number;
 };
 
-function formatTokens(n: number): string {
-  if (n >= 1_000_000) return (n / 1_000_000).toFixed(1).replace(/\.0$/, "") + "M";
-  if (n >= 1000) return (n / 1000).toFixed(1).replace(/\.0$/, "") + "k";
-  return String(n);
+export function formatTokens(n: number): string {
+  if (n >= 1_000_000) return (n / 1_000_000).toFixed(2) + "M";
+  if (n >= 1000) return (n / 1000).toFixed(2) + "k";
+  return n.toLocaleString();
 }
 
 type CardProps = {
@@ -26,7 +26,7 @@ function StatCard({ label, value, hint }: CardProps) {
         border: "1px solid var(--dsw-alias-border-l2)",
         background: "var(--dsw-alias-bg-layer-3)",
         borderRadius: 12,
-        padding: "14px 16px",
+        padding: "12px 14px",
         display: "flex",
         flexDirection: "column",
         gap: 4,
@@ -34,7 +34,7 @@ function StatCard({ label, value, hint }: CardProps) {
       }}
     >
       <div style={{ fontSize: 12, color: "var(--dsw-alias-label-tertiary)", lineHeight: "18px" }}>{label}</div>
-      <div style={{ fontSize: 20, fontWeight: 600, color: "var(--dsw-alias-label-primary)", lineHeight: "28px", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+      <div style={{ fontSize: 18, fontWeight: 600, color: "var(--dsw-alias-label-primary)", lineHeight: "28px", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
         {formatTokens(value)}
       </div>
       {hint ? <div style={{ fontSize: 12, color: "var(--dsw-alias-label-tertiary)", lineHeight: "16px" }}>{hint}</div> : null}
@@ -55,7 +55,7 @@ export function StatsCards({
     <div
       style={{
         display: "grid",
-        gridTemplateColumns: "repeat(auto-fit, minmax(140px, 1fr))",
+        gridTemplateColumns: "repeat(4, minmax(0, 1fr))",
         gap: 12,
       }}
     >

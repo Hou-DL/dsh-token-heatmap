@@ -4,9 +4,9 @@ import type { DayAgg } from "../aggregation.ts";
 export type TopItem = { model?: string; provider?: string; name: string; tokens: number };
 
 function formatTokens(n: number): string {
-  if (n >= 1_000_000) return (n / 1_000_000).toFixed(1).replace(/\.0$/, "") + "M";
-  if (n >= 1000) return (n / 1000).toFixed(1).replace(/\.0$/, "") + "k";
-  return String(n);
+  if (n >= 1_000_000) return (n / 1_000_000).toFixed(2) + "M";
+  if (n >= 1000) return (n / 1000).toFixed(2) + "k";
+  return n.toLocaleString();
 }
 
 export function ModelTop5({
@@ -44,14 +44,6 @@ export function ModelTop5({
   }
 
   const max = active[0]?.tokens ?? 1;
-
-  const winners: Array<{ dayKey: string; name: string }> = [];
-  if (days) {
-    for (const d of days) {
-      const w = mode === "provider" ? d.winnerProvider : d.winnerModel;
-      if (w) winners.push({ dayKey: d.dayKey, name: w });
-    }
-  }
 
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
@@ -150,42 +142,7 @@ export function ModelTop5({
         </div>
       </div>
 
-      {winners.length > 0 ? (
-        <div
-          style={{
-            border: "1px solid var(--dsw-alias-border-l2)",
-            background: "var(--dsw-alias-bg-layer-3)",
-            borderRadius: 12,
-            padding: 12,
-          }}
-        >
-          <div style={{ fontSize: 12, fontWeight: 600, color: "var(--dsw-alias-label-primary)", marginBottom: 8 }}>
-            {t(mode === "provider" ? "provider.winner" : "model.winner")}
-          </div>
-          <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
-            {winners.slice(0, 14).map((w) => (
-              <span
-                key={w.dayKey}
-                title={`${w.dayKey}: ${w.name}`}
-                style={{
-                  fontSize: 11,
-                  padding: "2px 6px",
-                  borderRadius: 999,
-                  background: "var(--dsw-alias-bg-layer-2, #f0f0f0)",
-                  color: "var(--dsw-alias-label-secondary)",
-                  border: "1px solid var(--dsw-alias-border-l2)",
-                  maxWidth: 140,
-                  overflow: "hidden",
-                  textOverflow: "ellipsis",
-                  whiteSpace: "nowrap",
-                }}
-              >
-                {w.dayKey.slice(5)} {w.name}
-              </span>
-            ))}
-          </div>
-        </div>
-      ) : null}
+
     </div>
   );
 }

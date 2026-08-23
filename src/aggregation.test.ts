@@ -47,7 +47,7 @@ describe("aggregation", () => {
     const month = a.monthDays("2026-08-15");
     expect(month.length).toBe(31);
     const quarter = a.quarterDays("2026-08-15");
-    expect(quarter.length).toBe(92); // Jul-Sep 2026: 31+31+30
+    expect(quarter.length).toBe(90); // sliding 90-day window
     const year = a.yearDays("2026-08-15");
     expect(year.length).toBe(365);
   });

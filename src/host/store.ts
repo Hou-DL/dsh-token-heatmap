@@ -43,6 +43,7 @@ export class HeatmapStore {
   }
 
   private rebuildPersistedAndAggregated() {
+    this.invalidateCache();
     // Build live aggregated from current events
     const live = aggregate(this.events, Date.now());
     // Merge live byDay into persisted (persisted never shrinks)
@@ -68,6 +69,7 @@ export class HeatmapStore {
   }
 
   private rebuildAggregated() {
+    this.invalidateCache();
     // Legacy path: just rebuild from persisted+live (used by ingest)
     this.aggregated = aggregateFromPersisted(this.persistedDays, Date.now());
     // Also need to incorporate any events not yet persisted? But persisted already contains merged live at init/refresh time.
@@ -75,11 +77,24 @@ export class HeatmapStore {
     this.emit();
   }
 
+  private cachedAgg: Aggregated | null = null;
+  private cachedAt = 0;
+  private static CACHE_TTL_MS = 30_000;
+
   getAggregated(): Aggregated {
-    // Recompute totals with fresh nowMs but keep persistedDays as source of truth
-    const live = aggregate(this.events, Date.now());
+    // Memoized for 30s to avoid re-aggregating on every poll; invalidated by ingest/refresh
+    const now = Date.now();
+    if (this.cachedAgg && now - this.cachedAt < HeatmapStore.CACHE_TTL_MS) return this.cachedAgg;
+    const live = aggregate(this.events, now);
     const merged = mergePersistedAndLive(this.persistedDays, live.byDay);
-    return aggregateFromPersisted(merged, Date.now());
+    this.cachedAgg = aggregateFromPersisted(merged, now);
+    this.cachedAt = now;
+    return this.cachedAgg;
+  }
+
+  private invalidateCache() {
+    this.cachedAgg = null;
+    this.cachedAt = 0;
   }
 
   /** Ingest a single session event incrementally */
