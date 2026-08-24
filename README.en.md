@@ -30,11 +30,11 @@ Restart, then open **Settings → Token Heatmap**.
 ## Screenshots
 
 <p align="center">
-  <img src="assets/screenshot-week.png" alt="Week view" width="80%">
+  <img src="assets/screenshot-week.png" alt="Week view" width="60%">
   <br><br>
-  <img src="assets/screenshot-month.png" alt="Month view" width="80%">
+  <img src="assets/screenshot-month.png" alt="Month view" width="60%">
   <br><br>
-  <img src="assets/screenshot-quarter-year.png" alt="Quarter / Year view" width="80%">
+  <img src="assets/screenshot-quarter-year.png" alt="Quarter / Year view" width="60%">
 </p>
 
 ## Features
