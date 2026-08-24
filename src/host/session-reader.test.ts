@@ -3,7 +3,7 @@ import { mkdirSync, writeFileSync, mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { zstdCompressSync } from "node:zlib";
-import { readAllUsageEvents } from "./session-reader.js";
+import { readAllUsageEvents, readLiveUsageEvents } from "./session-reader.js";
 
 function makeEvent(type: string, seq: number, time: number, data: any = {}) {
   return { type, seq, time, data };
@@ -99,6 +99,41 @@ describe("readAllUsageEvents", () => {
     try {
       const out = await readAllUsageEvents({ sessions: { list: async () => [] } } as any);
       expect(out).toEqual([]);
+    } finally {
+      process.env.HOME = prevHome;
+    }
+  });
+
+  it("readLiveUsageEvents returns ONLY live sessions (no disk scan), sid-tagged", async () => {
+    home = mkdtempSync(join(tmpdir(), "heatmap-sess-"));
+    const root = join(home, ".dsh", "sessions");
+    const t0 = Date.UTC(2026, 7, 1, 8, 0, 0);
+    // Session on disk but NOT live: must NOT appear in the live-only read.
+    writeSession(root, "--ws--", "old-session-a", [
+      makeEvent("assistant/message", 1, t0, {
+        message: { source: { provider: "pA", model: "mA" } },
+        usage: { inputTokens: 100, cacheReadTokens: 0, cacheWriteTokens: 0, outputTokens: 50 },
+        turn: 1, step: 1,
+      }),
+    ]);
+    const liveB = {
+      id: "live-session-b",
+      events: [
+        makeEvent("assistant/message", 1, t0, {
+          message: { source: { provider: "pB", model: "mB" } },
+          usage: { inputTokens: 200, cacheReadTokens: 0, cacheWriteTokens: 0, outputTokens: 60 },
+          turn: 1, step: 1,
+        }),
+      ],
+    };
+    const ctx = { sessions: { list: async () => [liveB] } };
+    const prevHome = process.env.HOME;
+    process.env.HOME = home;
+    try {
+      const out = await readLiveUsageEvents(ctx as any);
+      expect(out.length).toBe(1); // only the live session, disk-only A excluded
+      expect(out[0].provider).toBe("pB");
+      expect(out[0].sid).toBe("live-session-b"); // sid tagged for store refresh replace
     } finally {
       process.env.HOME = prevHome;
     }

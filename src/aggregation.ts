@@ -18,6 +18,9 @@ export type RawUsageEvent = {
     cacheWriteTokens: number;
     outputTokens: number;
   };
+  /** Session id this usage belongs to. Used by HeatmapStore.refresh() to
+   *  replace a live session's events in place without duplicating history. */
+  sid?: string;
 };
 
 export type DayAgg = {

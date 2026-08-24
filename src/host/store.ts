@@ -1,5 +1,5 @@
 import { aggregate, type Aggregated, type RawUsageEvent, type DayAgg } from "../aggregation.ts";
-import { parseUsageEvents, readAllUsageEvents } from "./session-reader.ts";
+import { parseUsageEvents, readAllUsageEvents, readLiveUsageEvents } from "./session-reader.ts";
 import { loadPersisted, savePersisted, mergePersistedAndLive } from "./persist.ts";
 import { toDayKey } from "../date-bucket.ts";
 
@@ -26,17 +26,21 @@ export class HeatmapStore {
     this.rebuildPersistedAndAggregated();
   }
 
-  /** Full rescan + merge with persisted (call on manual refresh or periodic timer) */
+  /**
+   * Refresh from LIVE sessions only. The full disk scan happened once at
+   * init(); afterwards only live (in-memory) sessions change, so re-scanning
+   * the whole ~/.dsh/sessions tree on every refresh would be wasted work.
+   *
+   * A live session's snapshot includes its full stored log, so we REPLACE that
+   * session's events in place (never append) — history for sessions that are
+   * no longer live is kept as-is from init(). This keeps each event present at
+   * most once in this.events, so the max-merge into persistedDays never
+   * under- or over-counts.
+   */
   async refresh(): Promise<void> {
-    const evs = await readAllUsageEvents(this.ctx);
-    this.events = evs;
-    // Reload persisted to pick up external changes (if any)
-    const freshPersisted = loadPersisted();
-    // Merge in case persisted was updated elsewhere since init
-    this.persistedDays = mergePersistedAndLive(freshPersisted, this.persistedDays as any) as any;
-    // Actually persistedDays is Map<string,DayAgg>, freshPersisted is same type
-    // The above line merges two persisted maps - but we already have persistedDays; just keep it
-    // Simpler: reload then rebuild
+    const live = await readLiveUsageEvents(this.ctx);
+    const liveSids = new Set(live.map((e) => e.sid).filter(Boolean) as string[]);
+    this.events = [...this.events.filter((e) => !liveSids.has(e.sid)), ...live];
     this.persistedDays = loadPersisted();
     this.rebuildPersistedAndAggregated();
   }
@@ -126,6 +130,7 @@ export class HeatmapStore {
           time: event.time ?? Date.now(),
           provider: f.provider,
           model: f.model,
+          sid,
           usage: {
             inputTokens: u.inputTokens ?? 0,
             cacheReadTokens: u.cacheReadTokens ?? 0,
@@ -155,6 +160,7 @@ export class HeatmapStore {
         time: event.time ?? Date.now(),
         provider,
         model,
+        sid,
         usage: {
           inputTokens: u.inputTokens ?? 0,
           cacheReadTokens: u.cacheReadTokens ?? 0,

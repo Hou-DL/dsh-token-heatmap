@@ -54,6 +54,7 @@ export function parseUsageEvents(events: SessionEvent[]): RawUsageEvent[] {
           time: ev.time ?? Date.now(),
           provider: fb.provider,
           model: fb.model,
+          sid,
           usage: {
             inputTokens: u.inputTokens ?? 0,
             cacheReadTokens: u.cacheReadTokens ?? 0,
@@ -77,6 +78,7 @@ export function parseUsageEvents(events: SessionEvent[]): RawUsageEvent[] {
         time: ev.time ?? Date.now(),
         provider,
         model,
+        sid,
         usage: {
           inputTokens: u.inputTokens ?? 0,
           cacheReadTokens: u.cacheReadTokens ?? 0,
@@ -188,4 +190,33 @@ export async function readAllUsageEvents(ctx: any): Promise<RawUsageEvent[]> {
   } catch {}
 
   return parseUsageEvents(allEvents);
+}
+
+/**
+ * Read usage from LIVE sessions only (ctx.sessions.list() = sessions created
+ * or resumed in the current process). Cheap — no disk scan. Used by
+ * store.refresh() after init() has already captured the full disk history,
+ * so refreshes do not re-decompress ~/.dsh/sessions on every tick.
+ *
+ * A live session's `events` includes its full stored log, so the result is a
+ * complete snapshot per live session; callers must REPLACE (not append) that
+ * session's events to avoid double counting.
+ */
+export async function readLiveUsageEvents(ctx: any): Promise<RawUsageEvent[]> {
+  const events: SessionEvent[] = [];
+  const relevant = (o: any) =>
+    o.type === "request/header" || o.type === "request/context" ||
+    o.type === "assistant/chunk" || o.type === "assistant/message";
+  try {
+    if (ctx.sessions?.list) {
+      const sessions = await ctx.sessions.list();
+      for (const s of sessions ?? []) {
+        const sid = s?.id ?? "live";
+        for (const event of (s as any)?.events ?? []) {
+          if (relevant(event)) events.push({ ...event, sid });
+        }
+      }
+    }
+  } catch {}
+  return parseUsageEvents(events);
 }
