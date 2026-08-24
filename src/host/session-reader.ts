@@ -1,5 +1,81 @@
 import type { RawUsageEvent } from "../aggregation.ts";
 
+/** zstd frame magic: bytes 28 B5 2F FD, read as UInt32LE. */
+const ZSTD_MAGIC = 0xfd2fb528;
+
+/**
+ * Locate complete zstd frames inside a concatenated-frame container (the
+ * format DSH's session.jsonl.zstd uses: every appended batch is its own
+ * compressed frame). Scans the frame structure WITHOUT decompressing, mirroring
+ * @deepseek-ai/dsh-session-persistence-jsonl's scanZstdFrames. Returns
+ * [start,end) byte ranges, one per complete frame.
+ */
+export function scanZstdFrames(buffer: Buffer): Array<{ start: number; end: number }> {
+  const frames: Array<{ start: number; end: number }> = [];
+  let offset = 0;
+  while (offset < buffer.length) {
+    const start = offset;
+    if (buffer.length - offset < 4) break;
+    if (buffer.readUInt32LE(offset) !== ZSTD_MAGIC) break; // torn/corrupt tail: stop
+    offset += 4;
+    if (offset === buffer.length) break;
+    const descriptor = buffer.readUInt8(offset);
+    offset += 1;
+    if ((descriptor & 24) !== 0) break; // reserved frame-header bit
+    const contentSizeFlag = descriptor >>> 6;
+    const singleSegment = (descriptor & 32) !== 0;
+    const checksum = (descriptor & 4) !== 0;
+    const dictionaryFlag = descriptor & 3;
+    const dictionaryBytes = dictionaryFlag === 3 ? 4 : dictionaryFlag;
+    const contentSizeBytes = contentSizeFlag === 0 ? (singleSegment ? 1 : 0) : 1 << contentSizeFlag;
+    const remainingHeaderBytes = (singleSegment ? 0 : 1) + dictionaryBytes + contentSizeBytes;
+    if (buffer.length - offset < remainingHeaderBytes) break;
+    offset += remainingHeaderBytes;
+    for (;;) {
+      if (buffer.length - offset < 3) break;
+      const blockHeader = buffer.readUIntLE(offset, 3);
+      offset += 3;
+      const lastBlock = (blockHeader & 1) !== 0;
+      const blockType = (blockHeader >>> 1) & 3;
+      const blockSize = blockHeader >>> 3;
+      if (blockType === 3) break; // reserved block type
+      const payloadBytes = blockType === 1 ? 1 : blockSize; // RLE payload is 1 byte
+      if (buffer.length - offset < payloadBytes) break;
+      offset += payloadBytes;
+      if (lastBlock) break;
+    }
+    if (checksum) {
+      if (buffer.length - offset < 4) break;
+      offset += 4;
+    }
+    frames.push({ start, end: offset });
+  }
+  return frames;
+}
+
+/**
+ * Decode a concatenated-frame zstd session log to its full UTF-8 text.
+ * Node's one-shot `zstdDecompressSync` decodes only the FIRST frame, so we
+ * locate every frame and decode each one separately (per
+ * dsh-session-persistence-jsonl's zstd-public-decoder). Returns null on any
+ * decode failure (callers treat a null text as "no data from this file").
+ */
+export async function decodeSessionZstd(buffer: Buffer): Promise<string | null> {
+  const zlib = await import("node:zlib");
+  if (typeof zlib.zstdDecompressSync !== "function") return null; // caller falls back to CLI
+  const frames = scanZstdFrames(buffer);
+  if (frames.length === 0) return null;
+  const parts: string[] = [];
+  for (const { start, end } of frames) {
+    try {
+      parts.push(zlib.zstdDecompressSync(buffer.subarray(start, end)).toString("utf-8"));
+    } catch {
+      return null; // corrupt frame: treat whole file as unreadable
+    }
+  }
+  return parts.join("");
+}
+
 type SessionEvent = {
   type: string;
   time?: number;
@@ -151,10 +227,11 @@ export async function readAllUsageEvents(ctx: any): Promise<RawUsageEvent[]> {
           let text: string;
           if (f.endsWith(".zstd")) {
             const { readFileSync } = await import("node:fs");
-            const zlib = await import("node:zlib");
-            if (typeof zlib.zstdDecompressSync === "function") {
-              // Native zstd (Node >= 23.8 / 24): no external `zstd` binary needed.
-              text = zlib.zstdDecompressSync(readFileSync(f)).toString("utf-8");
+            // DSH session logs are concatenated-frame zstd: decode EVERY frame,
+            // not just the first (one-shot zstdDecompressSync only yields frame 1).
+            const textFromFrames = await decodeSessionZstd(readFileSync(f));
+            if (textFromFrames !== null) {
+              text = textFromFrames;
             } else {
               // Fallback for Node < 23.8 (no built-in zstd): external CLI required.
               const { execSync } = await import("node:child_process");

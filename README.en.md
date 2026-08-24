@@ -4,7 +4,13 @@
 
 A local Token usage heatmap plugin for DSH Web — GitHub-style calendar views, built into the Settings pane.
 
+## Requirements
+
+- **Node.js ≥ 23.8** (built-in `node:zlib` zstd decoding, no extra install); on older Node it falls back to an external `zstd` CLI (`sudo apt install zstd` / `brew install zstd`).
+- A running **DSH Web profile** (`dsh web`).
+
 ## Install
+
 
 ```bash
 # From GitHub

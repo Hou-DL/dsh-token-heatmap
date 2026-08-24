@@ -4,7 +4,13 @@
 
 本地 Token 用量热图插件，GitHub 风格日历视图，内置于 DSH Web 设置页。
 
+## 环境要求
+
+- **Node.js ≥ 23.8**（内置 `node:zlib` 的 zstd 解码，无需额外安装）；更早版本会回退到外部 `zstd` CLI（`sudo apt install zstd` / `brew install zstd`）。
+- **DSH Web profile**（`dsh web` 已运行）。
+
 ## 安装
+
 
 ```bash
 # 从 GitHub
