@@ -13,7 +13,6 @@ dsh plugin --profile web add "git+https://gitee.com/HouDL/dsh-token-heatmap.git"
 
 重启后打开 **设置 → Token Heatmap**。
 
-> **zstd 依赖**：`session.jsonl.zstd` 的解压优先走 Node 内置 `node:zlib`（Node ≥ 23.8 / 24，无需额外安装）；仅 Node < 23.8 才回退外部 `zstd` CLI（此时需 `sudo apt install zstd` 或 `brew install zstd`）。
 
 - **零网络、零计费**：只读本地会话日志
 - **持久化**：历史落盘，删除会话不丢数据
