@@ -1,6 +1,6 @@
 {
   "name": "dsh-token-heatmap",
-  "version": "0.1.1-beta",
+  "version": "0.1.2-beta",
   "type": "module",
   "description": "设置内独立栏的本地 Token 热图：周/月/季度/年视图 + 日周月总统计 + 按模型/供应商 Top5",
   "main": "lib/index.mjs",

@@ -1,6 +1,10 @@
 /** dsh-token-heatmap build: ESM host (Node) + official client bundle
  *  (cjs wrapped in the `__ModuleLoader__` contract required by dsh-client-modules). */
 
+import { readFileSync } from "node:fs";
+
+const pkg = JSON.parse(readFileSync(new URL("./package.json", import.meta.url), "utf-8"));
+
 export default [
   // Host-side plugin entry (Node ESM)
   {
@@ -26,6 +30,7 @@ export default [
     clean: false,
     sourcemap: true,
     external: [/@deepseek-ai\/dsh-client-/, "react", "react-dom"],
+    define: { __PLUGIN_VERSION__: JSON.stringify(pkg.version) },
     outputOptions: {
       entryFileNames: "client.js",
       banner: 'window.__ModuleLoader__.load({ id: "dsh-token-heatmap", factory: (require) => {',

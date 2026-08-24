@@ -1,3 +1,5 @@
+declare const __PLUGIN_VERSION__: string;
+
 import * as React from "react";
 import { StatsCards } from "./StatsCards.tsx";
 import { HeatmapGrid, type ViewKind } from "./HeatmapGrid.tsx";
@@ -23,6 +25,17 @@ export function SettingsSection({ t, ctx, days: injectedDays, totals: injectedTo
   const [lang, setLang] = React.useState<"zh" | "en">(() => {
     try { const v = localStorage.getItem("dsh-token-heatmap:lang"); return v === "en" ? "en" : "zh"; } catch { return "zh"; }
   });
+  // ⋯ 菜单：显式开关 + 点击外部自动收回
+  const [menuOpen, setMenuOpen] = React.useState(false);
+  const menuRef = React.useRef<HTMLDivElement | null>(null);
+  React.useEffect(() => {
+    if (!menuOpen) return;
+    const onDown = (e: MouseEvent) => {
+      if (menuRef.current && !menuRef.current.contains(e.target as Node)) setMenuOpen(false);
+    };
+    document.addEventListener("mousedown", onDown);
+    return () => document.removeEventListener("mousedown", onDown);
+  }, [menuOpen]);
 
   const days = injectedDays ?? computedDays;
   const totals = injectedTotals ?? aggregated?.totals;
@@ -106,6 +119,9 @@ export function SettingsSection({ t, ctx, days: injectedDays, totals: injectedTo
         <div>
           <h2 id="heatmap-title" style={{ margin: 0, fontSize: 16, fontWeight: 600, color: "var(--dsw-alias-label-primary)" }}>
             {t("heatmap.title")}
+            <span style={{ marginLeft: 8, fontSize: 11, fontWeight: 400, color: "var(--dsw-alias-label-tertiary)", verticalAlign: "middle" }}>
+              v{__PLUGIN_VERSION__}
+            </span>
           </h2>
           <p style={{ margin: "4px 0 0", fontSize: 13, color: "var(--dsw-alias-label-tertiary)", lineHeight: 1.5 }}>
             {lang === "en" ? "Token usage from local session logs, bucketed by Asia/Shanghai. Synced once then persisted — deleting sessions keeps history." : t("heatmap.subtitle")}
@@ -162,13 +178,21 @@ export function SettingsSection({ t, ctx, days: injectedDays, totals: injectedTo
             <option value={60}>60 min</option>
           </select>
         </label>
-        <div style={{ position: "relative" }}>
-          <details style={{ display: "inline" }}>
-            <summary style={{ listStyle: "none", cursor: "pointer", padding: "2px 6px", fontSize: 11, color: "var(--dsw-alias-label-tertiary)", opacity: 0.6 }}>⋯</summary>
-            <div style={{ position: "absolute", right: 0, top: "100%", zIndex: 10, background: "var(--dsw-alias-bg-layer-3)", border: "1px solid var(--dsw-alias-border-l2)", borderRadius: 8, padding: 6, minWidth: 120, boxShadow: "0 4px 12px rgba(0,0,0,0.12)" }}>
+        <div style={{ position: "relative" }} ref={menuRef}>
+          <button
+            onClick={(e) => { e.stopPropagation(); setMenuOpen((o) => !o); }}
+            aria-haspopup="menu"
+            aria-expanded={menuOpen}
+            style={{ listStyle: "none", cursor: "pointer", padding: "2px 8px", fontSize: 13, color: "var(--dsw-alias-label-tertiary)", opacity: 0.7, border: "none", background: "transparent" }}
+          >⋯</button>
+          {menuOpen ? (
+            <div
+              style={{ position: "absolute", right: 0, top: "100%", zIndex: 10, background: "var(--dsw-alias-bg-layer-3)", border: "1px solid var(--dsw-alias-border-l2)", borderRadius: 8, padding: 6, minWidth: 120, boxShadow: "0 4px 12px rgba(0,0,0,0.12)" }}
+              onClick={(e) => { e.stopPropagation(); setMenuOpen(false); }}
+            >
               <button onClick={handleReset} style={{ width: "100%", padding: "6px 10px", fontSize: 12, borderRadius: 6, border: "none", background: "transparent", color: "var(--dsw-alias-state-error-primary, #e5484d)", cursor: "pointer", textAlign: "left" }}>{lang === "en" ? "Reset history" : t("heatmap.reset")}</button>
             </div>
-          </details>
+          ) : null}
         </div>
       </div>
 
