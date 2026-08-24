@@ -4,6 +4,14 @@
 
 本地 Token 用量热图插件，GitHub 风格日历视图，内置于 DSH Web 设置页。
 
+## 安装
+
+```bash
+dsh plugin --profile web add github:Hou-DL/dsh-token-heatmap
+```
+
+重启后打开 **设置 → Token Heatmap** 即可。
+
 - **零网络、零计费**：只读本地会话日志，不触碰任何计费 / 余额接口
 - **持久化**：历史落盘，删除会话不丢数据
 - **多视图**：周（按小时展开）/ 月（日历）/ 季度（近 90 天）/ 年（整年双行）
@@ -11,7 +19,11 @@
 
 ## 截图
 
-![周视图](assets/screenshot-week.png) ![月视图](assets/screenshot-month.png) ![季度 / 年度视图](assets/screenshot-quarter-year.png)
+![周视图](assets/screenshot-week.png)
+
+![月视图](assets/screenshot-month.png)
+
+![季度 / 年度视图](assets/screenshot-quarter-year.png)
 
 ## 功能
 
@@ -25,14 +37,6 @@
 | 模型 Top 5 | 按模型或供应商查看，随视图窗口 / 点击日期动态切换 |
 | 刷新 | 手动刷新 + 自动刷新（5 / 10 / 30 / 60 分钟，可关闭） |
 | 语言 | 中 / 英文切换 |
-
-## 安装
-
-```bash
-dsh plugin --profile web add github:Hou-DL/dsh-token-heatmap
-```
-
-重启后打开 **设置 → Token Heatmap** 即可。
 
 ## 常见问题
 

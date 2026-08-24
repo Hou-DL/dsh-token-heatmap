@@ -4,6 +4,14 @@
 
 A local Token usage heatmap plugin for DSH Web — GitHub-style calendar views, built into the Settings pane.
 
+## Install
+
+```bash
+dsh plugin --profile web add github:Hou-DL/dsh-token-heatmap
+```
+
+Restart, then open **Settings → Token Heatmap**.
+
 - **Zero network, zero billing** — reads local session logs only, never touches billing/balance APIs
 - **Persistent** — history is stored on disk; deleting sessions never loses data
 - **Multiple views** — Week (per-hour) / Month (calendar) / Quarter (last ~90 days) / Year (full year, two rows)
@@ -11,7 +19,11 @@ A local Token usage heatmap plugin for DSH Web — GitHub-style calendar views, 
 
 ## Screenshots
 
-![Week view](assets/screenshot-week.png) ![Month view](assets/screenshot-month.png) ![Quarter / Year view](assets/screenshot-quarter-year.png)
+![Week view](assets/screenshot-week.png)
+
+![Month view](assets/screenshot-month.png)
+
+![Quarter / Year view](assets/screenshot-quarter-year.png)
 
 ## Features
 
@@ -25,14 +37,6 @@ A local Token usage heatmap plugin for DSH Web — GitHub-style calendar views, 
 | Top 5 models | By model or provider, switching with the view window / clicked date |
 | Refresh | Manual refresh + auto refresh (5 / 10 / 30 / 60 min, or off) |
 | Language | 中 / English switch |
-
-## Install
-
-```bash
-dsh plugin --profile web add github:Hou-DL/dsh-token-heatmap
-```
-
-Restart, then open **Settings → Token Heatmap**.
 
 ## FAQ
 
