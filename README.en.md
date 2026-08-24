@@ -21,8 +21,10 @@ A settings-pane-only local Token heatmap plugin for DSH Web, styled after the Gi
 ## Install
 
 ```bash
-# 1. Add the plugin to your web profile
-dsh plugin --profile web add file:./dsh-token-heatmap
+# 1. Install the plugin from GitHub
+dsh plugin --profile web add github:Hou-DL/dsh-token-heatmap
+# 若之前装过 file: 本地版本，先移除再装：
+# dsh plugin --profile web remove dsh-token-heatmap
 
 # 2. Restart dsh web
 pkill -f "dsh web"

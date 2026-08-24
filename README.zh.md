@@ -14,8 +14,10 @@ DSH Web 设置内独立栏的本地 Token 热图插件，GitHub 风格日历视�
 ## 安装
 
 ```bash
-# 1. 把插件装进 web profile
-dsh plugin --profile web add file:./dsh-token-heatmap
+# 1. 从 GitHub 安装插件
+dsh plugin --profile web add github:Hou-DL/dsh-token-heatmap
+# 若之前装过 file: 本地版本，先移除再装：
+# dsh plugin --profile web remove dsh-token-heatmap
 
 # 2. 重启 dsh web
 pkill -f "dsh web"
