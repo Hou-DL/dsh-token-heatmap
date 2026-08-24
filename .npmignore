@@ -1,0 +1,6 @@
+node_modules/
+*.log
+.DS_Store
+
+# 源码与测试保留（src/ 发布到 npm 供 typecheck 用）
+# lib/ 已作为构建产物随仓库分发，npm 打包时依赖 files 字段，不在此排除
