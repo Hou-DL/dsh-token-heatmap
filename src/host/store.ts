@@ -11,6 +11,10 @@ export class HeatmapStore {
   private fallbackBySid = new Map<string, { provider: string; model: string }>();
   private ctx: any;
   private persistedDays = new Map<string, DayAgg>();
+  /** True after init() has finished scanning disk; false until then so
+   *  getAggregated() does not serve an incomplete (persisted-only) snapshot
+   *  that makes wide windows like Quarter look empty until a hard refresh. */
+  private initialized = false;
 
   constructor(ctx: any) {
     this.ctx = ctx;
@@ -24,6 +28,7 @@ export class HeatmapStore {
     const evs = await readAllUsageEvents(this.ctx);
     this.events = evs;
     this.rebuildPersistedAndAggregated();
+    this.initialized = true;
   }
 
   /**
@@ -85,6 +90,12 @@ export class HeatmapStore {
   private static CACHE_TTL_MS = 30_000;
 
   getAggregated(): Aggregated {
+    // Before init() completes (disk scan + multi-frame zstd decode), return an
+    // EMPTY snapshot so the client shows a loading state instead of caching an
+    // incomplete (persisted-only) result that makes Quarter look empty until a
+    // hard refresh. The client's auto-refresh (10 min) or a manual refresh will
+    // pick up the complete data once init() has set this.initialized = true.
+    if (!this.initialized) return aggregate([], Date.now());
     // Memoized for 30s to avoid re-aggregating on every poll; invalidated by ingest/refresh
     const now = Date.now();
     if (this.cachedAgg && now - this.cachedAt < HeatmapStore.CACHE_TTL_MS) return this.cachedAgg;

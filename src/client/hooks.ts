@@ -102,8 +102,14 @@ export function useHeatmapData(ctx: any | null, refreshMs?: number, manualTick?:
     try {
       const apiData = await fetchFromApi();
       if (apiData) {
+        const isEmpty = apiData.byDay.size === 0;
         setData(apiData);
         setLastRefresh(new Date().toLocaleString());
+        // If the host hasn't finished init() (empty data), retry shortly
+        // instead of waiting for the next 10-min auto-refresh cycle.
+        if (isEmpty) {
+          setTimeout(() => { setTick((t) => t + 1); }, 3000);
+        }
         return;
       }
       const store = ctx?.get?.("heatmapStore") ?? (typeof window !== "undefined" ? (window as any).__dsh_heatmapStore : null);

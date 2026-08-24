@@ -39,6 +39,7 @@ describe("parseUsageEvents", () => {
 describe("HeatmapStore ingest", () => {
   test("incremental ingest dedups chunk then message", () => {
     const store = new HeatmapStore({});
+    store.initialized = true;
     store.ingest({ type: "request/header", data: { header: { config: { provider: "p", model: "M" } } } });
     store.ingest({ type: "assistant/chunk", time: 1000, data: { turn: 1, step: 1, chunk: { type: "usage", usage: { inputTokens: 5, outputTokens: 2, cacheReadTokens: 0, cacheWriteTokens: 0 } } } });
     assert.equal(store.getAggregated().byDay.size, 1);
@@ -54,6 +55,7 @@ describe("HeatmapStore ingest", () => {
 describe("HeatmapStore getAggregated cache", () => {
   test("ingest invalidates memoized agg within TTL", () => {
     const store = new HeatmapStore({});
+    store.initialized = true;
     // ingest a chunk (provisional) then message (authoritative, replaces)
     store.ingest({ type: "request/header", data: { header: { config: { provider: "p", model: "M" } } } });
     store.ingest({ type: "assistant/message", time: Date.UTC(2026, 7, 21, 1, 0, 0), seq: 1, data: { turn: 1, step: 1, message: { source: { provider: "p", model: "M" } }, usage: { inputTokens: 10, outputTokens: 5, cacheReadTokens: 0, cacheWriteTokens: 0 } } });
