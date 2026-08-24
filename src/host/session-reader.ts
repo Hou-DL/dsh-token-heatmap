@@ -104,7 +104,6 @@ export async function readAllUsageEvents(ctx: any): Promise<RawUsageEvent[]> {
   try {
     const { readdirSync, existsSync } = await import("node:fs");
     const { join } = await import("node:path");
-    const { execSync } = await import("node:child_process");
     const home = process.env.HOME ?? "/home/dell";
     const sessionsDir = join(home, ".dsh", "sessions");
     if (!existsSync(sessionsDir)) return [];
@@ -125,7 +124,16 @@ export async function readAllUsageEvents(ctx: any): Promise<RawUsageEvent[]> {
       try {
         let text: string;
         if (f.endsWith(".zstd")) {
-          text = execSync(`zstd -dc ${JSON.stringify(f)}`, { encoding: "utf-8", maxBuffer: 50 * 1024 * 1024 });
+          const { readFileSync } = await import("node:fs");
+          const zlib = await import("node:zlib");
+          if (typeof zlib.zstdDecompressSync === "function") {
+            // Native zstd (Node >= 23.8 / 24): no external `zstd` binary needed.
+            text = zlib.zstdDecompressSync(readFileSync(f)).toString("utf-8");
+          } else {
+            // Fallback for Node < 23.8 (no built-in zstd): external CLI required.
+            const { execSync } = await import("node:child_process");
+            text = execSync(`zstd -dc ${JSON.stringify(f)}`, { encoding: "utf-8", maxBuffer: 50 * 1024 * 1024 });
+          }
         } else {
           const { readFileSync } = await import("node:fs");
           text = readFileSync(f, "utf-8");

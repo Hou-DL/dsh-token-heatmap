@@ -12,6 +12,8 @@ dsh plugin --profile web add github:Hou-DL/dsh-token-heatmap
 
 Restart, then open **Settings → Token Heatmap**.
 
+> **zstd dependency**: decoding `session.jsonl.zstd` uses Node's built-in `node:zlib` first (Node ≥ 23.8 / 24, no extra install); only on older Node < 23.8 does it fall back to the external `zstd` CLI (then `sudo apt install zstd` or `brew install zstd` is required).
+
 - **Zero network, zero billing** — reads local session logs only, never touches billing/balance APIs
 - **Persistent** — history is stored on disk; deleting sessions never loses data
 - **Multiple views** — Week (per-hour) / Month (calendar) / Quarter (last ~90 days) / Year (full year, two rows)
