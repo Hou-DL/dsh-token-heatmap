@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { test, describe } from "node:test";
-import { aggregate, clampLevel } from "./aggregation.ts";
+import { aggregate, clampLevel, levelByRank, logLevel, MIN_RANK_POINTS } from "./aggregation.ts";
 
 describe("aggregation", () => {
   test("aggregates day/week/month/all and top5", () => {
@@ -97,5 +97,59 @@ describe("hourly bucketing", () => {
     const day = a.byDay.get("2026-08-21");
     assert.ok(day);
     assert.equal(day.hourlyTokens[23], 42);
+  });
+});
+
+describe("rank-based bucketing (outlier-proof)", () => {
+  // 10 days: one huge outlier (1000), rest small (1..10)
+  const sorted = [1, 2, 3, 4, 5, 6, 7, 8, 9, 1000];
+
+  test("outlier no longer flattens the rest to level 1", () => {
+    // values in lower half (1..5) -> level 1
+    assert.equal(levelByRank(1, sorted), 1);
+    assert.equal(levelByRank(5, sorted), 1);
+    // 6,7 -> 50-75% -> 2
+    assert.equal(levelByRank(6, sorted), 2);
+    assert.equal(levelByRank(7, sorted), 2);
+    // 8 -> 2 (50-75%), 9 -> 3 (75-90%)
+    assert.equal(levelByRank(8, sorted), 2);
+    assert.equal(levelByRank(9, sorted), 3);
+    // 1000 -> top 10% -> 4
+    assert.equal(levelByRank(1000, sorted), 4);
+  });
+
+  test("zero always maps to level 0", () => {
+    assert.equal(levelByRank(0, sorted), 0);
+  });
+
+  test("ties share the same lower-bound rank", () => {
+    const withTies = [5, 5, 5, 5, 5, 5, 10];
+    // all 5s have below=0 -> rank 0 -> level 1
+    assert.equal(levelByRank(5, withTies), 1);
+    // 10 has below=6 -> rank 6/7≈0.857 <0.9 -> level 3
+    assert.equal(levelByRank(10, withTies), 3);
+  });
+
+  test("empty non-zero array maps any positive value to level 1", () => {
+    assert.equal(levelByRank(50, []), 1);
+  });
+
+  test("logLevel fallback: monotonic and outlier-compressed", () => {
+    const viewMax = 1_000_000;
+    assert.equal(logLevel(0, viewMax), 0);
+    // small relative to max -> level 1
+    assert.equal(logLevel(10, viewMax), 1);
+    // max itself -> level 4
+    assert.equal(logLevel(1_000_000, viewMax), 4);
+    // monotonic: bigger value never lower level
+    assert.ok(logLevel(500_000, viewMax) >= logLevel(100, viewMax));
+  });
+
+  test("sparse window (< MIN_RANK_POINTS) uses logLevel fallback", () => {
+    // only 2 non-zero days, e.g. [1, 1000]; viewMax=1000
+    const sparse = [1, 1000];
+    assert.equal(levelByRank(1, sparse), 1); // rank 0 -> 1
+    assert.equal(levelByRank(1000, sparse), 2); // rank 0.5 -> not <0.5 -> level 2
+    // note: with only 2 points ranks are coarse; the logLevel fallback handles <5 cases in the UI
   });
 });

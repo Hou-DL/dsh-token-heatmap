@@ -1,9 +1,59 @@
 import * as React from "react";
-import { levelForView, type DayAgg } from "../aggregation.ts";
+import { levelByRank, logLevel, MIN_RANK_POINTS, type DayAgg } from "../aggregation.ts";
 
 export type ViewKind = "week" | "month" | "quarter" | "year";
 
 const VIEW_ORDER: ViewKind[] = ["week", "month", "quarter", "year"];
+
+/**
+ * Build a rank-based (percentile) level map for a day-window, keyed by dayKey.
+ * Outlier-proof: a single huge day no longer flattens the rest of the window
+ * to level 1. Falls back to log-scaled ratio when non-zero days are too few.
+ */
+function buildDayLevels(days: DayAgg[]): Map<string, number> {
+  const nonZero = days
+    .filter((d) => d.totalTokens > 0)
+    .map((d) => d.totalTokens)
+    .sort((a, b) => a - b);
+  const viewMax = days.reduce((m, d) => Math.max(m, d.totalTokens), 0);
+  const map = new Map<string, number>();
+  for (const d of days) {
+    let level: number;
+    if (d.totalTokens <= 0) level = 0;
+    else if (nonZero.length < MIN_RANK_POINTS) level = logLevel(d.totalTokens, viewMax);
+    else level = levelByRank(d.totalTokens, nonZero);
+    map.set(d.dayKey, level);
+  }
+  return map;
+}
+
+/**
+ * Build rank-based level arrays for hour bars across a week (cross-day comparable).
+ * Maps dayKey -> number[24] of levels.
+ */
+function buildHourLevels(days: DayAgg[]): Map<string, number[]> {
+  const nonZero: number[] = [];
+  const raw = new Map<string, number[]>();
+  for (const d of days) {
+    const h = d.hourlyTokens ?? new Array(24).fill(0);
+    raw.set(d.dayKey, h);
+    for (const v of h) if (v > 0) nonZero.push(v);
+  }
+  nonZero.sort((a, b) => a - b);
+  const weekMax = nonZero.length ? nonZero[nonZero.length - 1] : 1;
+  const out = new Map<string, number[]>();
+  for (const [k, h] of raw) {
+    out.set(
+      k,
+      h.map((v) => {
+        if (v <= 0) return 0;
+        if (nonZero.length < MIN_RANK_POINTS) return logLevel(v, weekMax);
+        return levelByRank(v, nonZero);
+      }),
+    );
+  }
+  return out;
+}
 
 function formatTokensShort(n: number): string {
   if (n >= 1_000_000) return (n / 1_000_000).toFixed(2) + "M";
@@ -16,8 +66,7 @@ function tooltipTotal(day: DayAgg): string {
   return `${day.dayKey}: ${formatTokensShort(day.totalTokens)} tokens`;
 }
 
-function HeatCell({ day, viewMax, size = 14 }: { day: DayAgg; viewMax: number; size?: number }) {
-  const level = levelForView(day.totalTokens, viewMax);
+function HeatCell({ day, level, size = 14 }: { day: DayAgg; level: number; size?: number }) {
   const colors: Record<number, string> = {
     0: "var(--dsw-alias-bg-layer-2, #ebedf0)",
     1: "#c6e48b",
@@ -43,17 +92,7 @@ function HeatCell({ day, viewMax, size = 14 }: { day: DayAgg; viewMax: number; s
   );
 }
 
-/** Same quantile language as levelForView: 0, (0,25%], (25%,50%], (50%,75%], (75%,100%]. */
-function miniLevel(v: number, max: number): 0 | 1 | 2 | 3 | 4 {
-  if (v === 0 || max === 0) return 0;
-  const r = v / max;
-  if (r <= 0.25) return 1;
-  if (r <= 0.5) return 2;
-  if (r <= 0.75) return 3;
-  return 4;
-}
-
-function HourStrip({ day, weekMax }: { day: DayAgg; weekMax: number }) {
+function HourStrip({ day, hourLevels }: { day: DayAgg; hourLevels: number[] }) {
   const hourly = day.hourlyTokens ?? new Array(24).fill(0);
   const colors: Record<number, string> = {
     0: "var(--dsw-alias-bg-layer-2, #ebedf0)",
@@ -65,7 +104,7 @@ function HourStrip({ day, weekMax }: { day: DayAgg; weekMax: number }) {
   return (
     <div style={{ display: "flex", gap: 1, alignItems: "end", flex: 1, minWidth: 0 }}>
       {hourly.map((v, h) => {
-        const lv = miniLevel(v, weekMax);
+        const lv = hourLevels[h] ?? 0;
         const hh = v === 0 ? `${String(h).padStart(2, "0")}:00 — No usage` : `${String(h).padStart(2, "0")}:00 — ${formatTokensShort(v)} tokens`;
         return (
           <div
@@ -147,8 +186,7 @@ function MonthHeader({ weeks, cellSize }: { weeks: DayAgg[][]; cellSize: number 
   );
 }
 
-function GitHubGrid({ days, t, cellSize, twoRows, isEn }: { days: DayAgg[]; t: (k: string, p?: any) => string; cellSize: number; twoRows?: boolean; isEn?: boolean }) {
-  const viewMax = days.reduce((m, d) => Math.max(m, d.totalTokens), 1);
+function GitHubGrid({ days, t, cellSize, twoRows, isEn, dayLevels }: { days: DayAgg[]; t: (k: string, p?: any) => string; cellSize: number; twoRows?: boolean; isEn?: boolean; dayLevels: Map<string, number> }) {
   const weeks: DayAgg[][] = [];
   let cur: DayAgg[] = [];
   for (const d of days) {
@@ -178,7 +216,7 @@ function GitHubGrid({ days, t, cellSize, twoRows, isEn }: { days: DayAgg[]; t: (
             d.totalTokens === -1 ? (
               <div key={d.dayKey} style={{ width: cellSize, height: cellSize }} />
             ) : (
-              <HeatCell key={d.dayKey} day={d} viewMax={viewMax} size={cellSize} />
+              <HeatCell key={d.dayKey} day={d} level={dayLevels.get(d.dayKey) ?? 0} size={cellSize} />
             ),
           )}
         </div>
@@ -241,7 +279,7 @@ function GitHubGrid({ days, t, cellSize, twoRows, isEn }: { days: DayAgg[]; t: (
   );
 }
 
-function CalendarGrid({ days, t, viewMax, selectedKey, onSelect, isEn }: { days: DayAgg[]; t: (k:string,p?:any)=>string; viewMax: number; selectedKey: string | null; onSelect: (k: string | null) => void; isEn?: boolean }) {
+function CalendarGrid({ days, t, dayLevels, selectedKey, onSelect, isEn }: { days: DayAgg[]; t: (k:string,p?:any)=>string; dayLevels: Map<string, number>; selectedKey: string | null; onSelect: (k: string | null) => void; isEn?: boolean }) {
   const weekdaysZh = ["一","二","三","四","五","六","日"];
   const weekdaysEn = ["Mon","Tue","Wed","Thu","Fri","Sat","Sun"];
   const isZh = (t("heatmap.title") || "").includes("Token") ? false : false;
@@ -275,7 +313,7 @@ function CalendarGrid({ days, t, viewMax, selectedKey, onSelect, isEn }: { days:
         {cells.map((d, idx) => {
           if (!d) return <div key={`pad-${idx}`} style={{ minHeight: 50 }} />;
           const selected = d.dayKey === selectedKey;
-          const level = levelForView(d.totalTokens, viewMax);
+          const level = dayLevels.get(d.dayKey) ?? 0;
           const bgMap: Record<number,string> = { 0: "var(--dsw-alias-bg-layer-3)", 1: "#c6e48b", 2: "#7bc96f", 3: "#239a3b", 4: "#196127" };
           return (
             <button
@@ -327,12 +365,8 @@ export function HeatmapGrid({
 }) {
   const isWeek = view === "week";
   const hasAny = days.some((d) => d.totalTokens > 0);
-  const viewMax = days.reduce((m, d) => Math.max(m, d.totalTokens), 1);
-  // Week-view hour bars are colored against the whole week's peak hour (cross-day comparable)
-  const weekMax = days.reduce(
-    (m, d) => Math.max(m, ...(d.hourlyTokens ?? [])),
-    1,
-  );
+  const dayLevels = buildDayLevels(days);
+  const hourLevels = buildHourLevels(days);
   const cellSize = isWeek ? 16 : view === "quarter" ? 23 : (view === "year" ? 14 : 14);
 
   const handleViewChange = (v: ViewKind) => {
@@ -384,7 +418,7 @@ export function HeatmapGrid({
                   <span style={{ fontSize: 12, fontWeight: 600, color: "var(--dsw-alias-label-primary)", lineHeight: "16px" }}>{weekday}</span>
                   <span style={{ fontSize: 10, color: "var(--dsw-alias-label-tertiary)", lineHeight: "12px" }}>{d.dayKey.slice(5)}</span>
                 </div>
-                <HourStrip day={d} weekMax={weekMax} />
+                <HourStrip day={d} hourLevels={hourLevels.get(d.dayKey) ?? new Array(24).fill(0)} />
                 <span style={{ fontSize: 11, color: "var(--dsw-alias-label-tertiary)", whiteSpace: "nowrap", width: 80, textAlign: "right" }}>
                   {d.totalTokens === 0 ? "No usage" : `${formatTokensShort(d.totalTokens)} tokens`}
                 </span>
@@ -393,11 +427,11 @@ export function HeatmapGrid({
           })}
         </div>
       ) : view === "month" ? (
-        <CalendarGrid days={days} t={t} viewMax={viewMax} selectedKey={selectedKey ?? null} onSelect={onSelect ?? (() => {})} isEn={isEn} />
+        <CalendarGrid days={days} t={t} dayLevels={dayLevels} selectedKey={selectedKey ?? null} onSelect={onSelect ?? (() => {})} isEn={isEn} />
       ) : view === "year" ? (
-        <GitHubGrid days={days} t={t} cellSize={cellSize} twoRows isEn={isEn} />
+        <GitHubGrid days={days} t={t} cellSize={cellSize} twoRows isEn={isEn} dayLevels={dayLevels} />
       ) : (
-        <GitHubGrid days={days} t={t} cellSize={cellSize} isEn={isEn} />
+        <GitHubGrid days={days} t={t} cellSize={cellSize} isEn={isEn} dayLevels={dayLevels} />
       )}
 
       <div style={{ display: "flex", alignItems: "center", gap: 6, justifyContent: "flex-end", fontSize: 12, color: "var(--dsw-alias-label-tertiary)" }}>

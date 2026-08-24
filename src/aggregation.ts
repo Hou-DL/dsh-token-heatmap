@@ -108,6 +108,44 @@ export function levelForView(value: number, viewMax: number): 0 | 1 | 2 | 3 | 4 
   return 4;
 }
 
+/** Minimum number of non-zero values before rank-based bucketing kicks in. Below this we fall back to logLevel(). */
+export const MIN_RANK_POINTS = 5;
+
+/**
+ * Rank-based (percentile) level. Outlier-proof: no matter how large one day is,
+ * lower values still spread across levels 1-4 by their position among non-zero
+ * values — a single huge day no longer flattens everything to level 1.
+ * `sortedNonZero` must be the ascending-sorted array of all non-zero values in
+ * the view. 0 maps to 0; ties share the same (lower-bound) rank.
+ */
+export function levelByRank(value: number, sortedNonZero: number[]): 0 | 1 | 2 | 3 | 4 {
+  if (value <= 0) return 0;
+  const n = sortedNonZero.length;
+  if (n === 0) return 1;
+  let below = 0;
+  for (const v of sortedNonZero) if (v < value) below++;
+  const rank = below / n; // 0..1; ties keep the same lower-bound rank
+  if (rank < 0.5) return 1;   // lower half
+  if (rank < 0.75) return 2;  // 50-75%
+  if (rank < 0.9) return 3;   // 75-90%
+  return 4;                    // top 10%
+}
+
+/**
+ * Log-scaled ratio fallback for sparse data (< MIN_RANK_POINTS non-zero values).
+ * Compresses outliers logarithmically so a single large value doesn't flatten
+ * the rest, while keeping "larger = darker" intuition.
+ */
+export function logLevel(value: number, viewMax: number): 0 | 1 | 2 | 3 | 4 {
+  if (value <= 0) return 0;
+  if (viewMax <= 0) return 1;
+  const r = Math.log1p(value) / Math.log1p(viewMax);
+  if (r <= 0.25) return 1;
+  if (r <= 0.5) return 2;
+  if (r <= 0.75) return 3;
+  return 4;
+}
+
 function hourInShanghai(ms: number): number {
   // Convert to Asia/Shanghai hour 0-23. en-GB is used because en-US may emit
   // "24" for midnight on some ICU data; we also defensively clamp.
