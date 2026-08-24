@@ -7,10 +7,14 @@ A local Token usage heatmap plugin for DSH Web — GitHub-style calendar views, 
 ## Install
 
 ```bash
+# From GitHub
 dsh plugin --profile web add github:Hou-DL/dsh-token-heatmap
+
+# Or from Gitee (faster in China)
+dsh plugin --profile web add "git+https://gitee.com/HouDL/dsh-token-heatmap.git"
 ```
 
-Restart, then open **Settings → Token Heatmap**.
+Restart, then open **Settings → Token Heatmap**. (Note: `dsh plugin add` only accepts pnpm package names, `github:…`, `git+…`, or URL specs — a bare `gitee:` prefix is not a valid spec.)
 
 > **zstd dependency**: decoding `session.jsonl.zstd` uses Node's built-in `node:zlib` first (Node ≥ 23.8 / 24, no extra install); only on older Node < 23.8 does it fall back to the external `zstd` CLI (then `sudo apt install zstd` or `brew install zstd` is required).
 

@@ -5,7 +5,10 @@
 ## 安装
 
 ```bash
+# 从 GitHub
 dsh plugin --profile web add github:Hou-DL/dsh-token-heatmap
+# 或从 Gitee
+dsh plugin --profile web add "git+https://gitee.com/HouDL/dsh-token-heatmap.git"
 ```
 
 重启后打开 **设置 → Token Heatmap**。

@@ -7,10 +7,14 @@
 ## 安装
 
 ```bash
+# 从 GitHub
 dsh plugin --profile web add github:Hou-DL/dsh-token-heatmap
+
+# 或从 Gitee（国内访问更快）
+dsh plugin --profile web add "git+https://gitee.com/HouDL/dsh-token-heatmap.git"
 ```
 
-重启后打开 **设置 → Token Heatmap** 即可。
+重启后打开 **设置 → Token Heatmap** 即可。（注意：`dsh plugin add` 只接受 pnpm 的包名 / `github:` / `git+…` / 链接等形式，不支持 `gitee:` 前缀。）
 
 > **zstd 依赖**：`session.jsonl.zstd` 的解压优先走 Node 内置 `node:zlib`（Node ≥ 23.8 / 24，无需额外安装）；仅 Node < 23.8 才回退外部 `zstd` CLI（此时需 `sudo apt install zstd` 或 `brew install zstd`）。
 
