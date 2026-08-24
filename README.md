@@ -29,11 +29,13 @@ dsh plugin --profile web add "git+https://gitee.com/HouDL/dsh-token-heatmap.git"
 
 ## 截图
 
-![周视图](assets/screenshot-week.png)
-
-![月视图](assets/screenshot-month.png)
-
-![季度 / 年度视图](assets/screenshot-quarter-year.png)
+<p align="center">
+  <img src="assets/screenshot-week.png" alt="周视图" width="80%">
+  <br><br>
+  <img src="assets/screenshot-month.png" alt="月视图" width="80%">
+  <br><br>
+  <img src="assets/screenshot-quarter-year.png" alt="季度 / 年度视图" width="80%">
+</p>
 
 ## 功能
 
