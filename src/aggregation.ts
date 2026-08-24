@@ -116,19 +116,26 @@ export const MIN_RANK_POINTS = 5;
  * lower values still spread across levels 1-4 by their position among non-zero
  * values — a single huge day no longer flattens everything to level 1.
  * `sortedNonZero` must be the ascending-sorted array of all non-zero values in
- * the view. 0 maps to 0; ties share the same (lower-bound) rank.
+ * the view. Uses the midpoint of the "below" and "at-or-below" ranks, so ties
+ * sit in the middle of their band; the maximum always lands on level 4 and the
+ * minimum on level 1, guaranteeing all four colored levels appear (n ≥ 2).
+ * 0 maps to 0.
  */
 export function levelByRank(value: number, sortedNonZero: number[]): 0 | 1 | 2 | 3 | 4 {
   if (value <= 0) return 0;
   const n = sortedNonZero.length;
   if (n === 0) return 1;
   let below = 0;
-  for (const v of sortedNonZero) if (v < value) below++;
-  const rank = below / n; // 0..1; ties keep the same lower-bound rank
-  if (rank < 0.5) return 1;   // lower half
-  if (rank < 0.75) return 2;  // 50-75%
-  if (rank < 0.9) return 3;   // 75-90%
-  return 4;                    // top 10%
+  let atOrBelow = 0;
+  for (const v of sortedNonZero) {
+    if (v < value) below++;
+    if (v <= value) atOrBelow++;
+  }
+  const rank = (below / n + atOrBelow / n) / 2; // midpoint rank ∈ (0, 1)
+  if (rank <= 0.25) return 1;  // bottom quarter
+  if (rank <= 0.5) return 2;   // 25-50%
+  if (rank <= 0.75) return 3;  // 50-75%
+  return 4;                     // top quarter, max always here
 }
 
 /**

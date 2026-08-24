@@ -104,30 +104,27 @@ describe("rank-based bucketing (outlier-proof)", () => {
   // 10 days: one huge outlier (1000), rest small (1..10)
   const sorted = [1, 2, 3, 4, 5, 6, 7, 8, 9, 1000];
 
-  test("outlier no longer flattens the rest to level 1", () => {
-    // values in lower half (1..5) -> level 1
+  test("max value is always level 4; four colored levels all appear", () => {
+    // midpoint ranks for sorted=[1..9,1000], n=10:
+    // 1:.05->1 2:.15->1 3:.25->1 4:.35->2 5:.45->2 6:.55->3 7:.65->3 8:.75->3 9:.85->4 1000:.95->4
     assert.equal(levelByRank(1, sorted), 1);
-    assert.equal(levelByRank(5, sorted), 1);
-    // 6,7 -> 50-75% -> 2
-    assert.equal(levelByRank(6, sorted), 2);
-    assert.equal(levelByRank(7, sorted), 2);
-    // 8 -> 2 (50-75%), 9 -> 3 (75-90%)
-    assert.equal(levelByRank(8, sorted), 2);
-    assert.equal(levelByRank(9, sorted), 3);
-    // 1000 -> top 10% -> 4
-    assert.equal(levelByRank(1000, sorted), 4);
+    assert.equal(levelByRank(3, sorted), 1);
+    assert.equal(levelByRank(5, sorted), 2);
+    assert.equal(levelByRank(6, sorted), 3);
+    assert.equal(levelByRank(8, sorted), 3);
+    assert.equal(levelByRank(9, sorted), 4);
+    assert.equal(levelByRank(1000, sorted), 4); // max always top
   });
 
   test("zero always maps to level 0", () => {
     assert.equal(levelByRank(0, sorted), 0);
   });
 
-  test("ties share the same lower-bound rank", () => {
+  test("ties share the same midpoint rank; max stays top", () => {
     const withTies = [5, 5, 5, 5, 5, 5, 10];
-    // all 5s have below=0 -> rank 0 -> level 1
-    assert.equal(levelByRank(5, withTies), 1);
-    // 10 has below=6 -> rank 6/7≈0.857 <0.9 -> level 3
-    assert.equal(levelByRank(10, withTies), 3);
+    // 5: midpoint rank (0 + 6/7)/2 ≈ .429 -> 2; 10: (6/7+7/7)/2 ≈ .93 -> 4
+    assert.equal(levelByRank(5, withTies), 2);
+    assert.equal(levelByRank(10, withTies), 4);
   });
 
   test("empty non-zero array maps any positive value to level 1", () => {
@@ -137,19 +134,19 @@ describe("rank-based bucketing (outlier-proof)", () => {
   test("logLevel fallback: monotonic and outlier-compressed", () => {
     const viewMax = 1_000_000;
     assert.equal(logLevel(0, viewMax), 0);
-    // small relative to max -> level 1
     assert.equal(logLevel(10, viewMax), 1);
-    // max itself -> level 4
     assert.equal(logLevel(1_000_000, viewMax), 4);
-    // monotonic: bigger value never lower level
     assert.ok(logLevel(500_000, viewMax) >= logLevel(100, viewMax));
   });
 
-  test("sparse window (< MIN_RANK_POINTS) uses logLevel fallback", () => {
-    // only 2 non-zero days, e.g. [1, 1000]; viewMax=1000
+  test("max maps to 4 even with few points; UI falls back to logLevel below 5", () => {
     const sparse = [1, 1000];
-    assert.equal(levelByRank(1, sparse), 1); // rank 0 -> 1
-    assert.equal(levelByRank(1000, sparse), 2); // rank 0.5 -> not <0.5 -> level 2
-    // note: with only 2 points ranks are coarse; the logLevel fallback handles <5 cases in the UI
+    // midpoint rank on 2 points: 1 -> (.0+.5)/2=.25 -> 1; 1000 -> (.5+1)/2=.75 -> 3
+    assert.equal(levelByRank(1, sparse), 1);
+    assert.equal(levelByRank(1000, sparse), 3);
+    // UI uses logLevel when non-zero count < MIN_RANK_POINTS (5)
+    // log1p(1)/log1p(1000) = 0.693/6.909 ≈ 0.10 -> level 1 (deeply compressed)
+    assert.equal(logLevel(1, 1000), 1);
   });
 });
+
