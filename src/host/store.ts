@@ -8,8 +8,7 @@ export class HeatmapStore {
   private aggregated: Aggregated;
   private listeners = new Set<() => void>();
   private byTurnStep = new Map<string, RawUsageEvent>();
-  private fallbackProvider = "";
-  private fallbackModel = "";
+  private fallbackBySid = new Map<string, { provider: string; model: string }>();
   private ctx: any;
   private persistedDays = new Map<string, DayAgg>();
 
@@ -97,27 +96,36 @@ export class HeatmapStore {
     this.cachedAt = 0;
   }
 
-  /** Ingest a single session event incrementally */
+  /** Ingest a single session event incrementally. Keys are scoped per session
+   *  via `event.sid` (set by the plugin's session/event handler) so sessions
+   *  with the same turn/step do not overwrite each other. */
   ingest(event: any) {
+    const sid = (event as any)?.sid ?? "";
+    const fb = (): { provider: string; model: string } => this.fallbackBySid.get(sid) ?? { provider: "", model: "" };
+    const setFb = (provider?: string, model?: string) => {
+      const cur = this.fallbackBySid.get(sid) ?? { provider: "", model: "" };
+      if (provider) cur.provider = provider;
+      if (model) cur.model = model;
+      this.fallbackBySid.set(sid, cur);
+    };
     if (event.type === "request/header" && event.data?.header?.config) {
       const cfg = event.data.header.config;
-      if (cfg.provider) this.fallbackProvider = cfg.provider;
-      if (cfg.model) this.fallbackModel = cfg.model;
+      setFb(cfg.provider, cfg.model);
       return;
     }
     if (event.type === "request/context" && event.data) {
-      if (event.data.provider) this.fallbackProvider = event.data.provider;
-      if (event.data.model) this.fallbackModel = event.data.model;
+      setFb(event.data.provider, event.data.model);
       return;
     }
     if (event.type === "assistant/chunk" && event.data?.chunk?.type === "usage") {
-      const key = `${event.data.turn}:${event.data.step}`;
+      const key = `${sid}::${event.data.turn}:${event.data.step}`;
       if (!this.byTurnStep.has(key)) {
+        const f = fb();
         const u = event.data.chunk.usage;
         const ev: RawUsageEvent = {
           time: event.time ?? Date.now(),
-          provider: this.fallbackProvider,
-          model: this.fallbackModel,
+          provider: f.provider,
+          model: f.model,
           usage: {
             inputTokens: u.inputTokens ?? 0,
             cacheReadTokens: u.cacheReadTokens ?? 0,
@@ -135,11 +143,12 @@ export class HeatmapStore {
     if (event.type === "assistant/message" && event.data?.usage) {
       const msg = event.data.message;
       const src = msg?.source;
-      const provider = src?.provider ?? this.fallbackProvider;
-      const model = src?.model ?? this.fallbackModel;
+      const f = fb();
+      const provider = src?.provider ?? f.provider;
+      const model = src?.model ?? f.model;
       const turn = event.data.turn;
       const step = event.data.step;
-      const key = turn !== undefined && step !== undefined ? `${turn}:${step}` : `msg:${event.seq ?? Math.random()}`;
+      const key = turn !== undefined && step !== undefined ? `${sid}::${turn}:${step}` : `${sid}::msg:${event.seq ?? Math.random()}`;
       const existing = this.byTurnStep.get(key);
       const u = event.data.usage;
       const ev: RawUsageEvent = {
@@ -160,8 +169,7 @@ export class HeatmapStore {
       }
       this.byTurnStep.set(key, ev);
       this.events.push(ev);
-      if (src?.provider) this.fallbackProvider = src.provider;
-      if (src?.model) this.fallbackModel = src.model;
+      setFb(src?.provider, src?.model);
       this.persistIncremental(ev);
       this.rebuildAggregated();
     }

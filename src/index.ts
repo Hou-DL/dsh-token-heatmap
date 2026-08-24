@@ -14,9 +14,10 @@ export function apply(ctx: any) {
     ctx.logger?.warn?.(`dsh-token-heatmap init failed: ${String(e)}`);
   });
 
-  ctx.on("session/event", (_session: any, event: any) => {
+  ctx.on("session/event", (session: any, event: any) => {
     if (disposed) return;
-    store.ingest(event);
+    // Tag with the session id so per-session turn/step keys never collide.
+    store.ingest({ ...event, sid: session?.id ?? "" });
   });
 
   ctx.on("session/flush", () => {});
