@@ -10,7 +10,13 @@
 - **统计**：今日 / 本周 / 本月 / 累计
 - **Top5**：按模型 + 供应商双 Tab，按视图窗口动态计算；点击日期格后展示当日 Top5
 
-![overview](https://placehold.co/720x420?text=dsh-token-heatmap%20%E7%95%8C%E9%9D%A2)
+## 截图
+
+![周视图](assets/screenshot-week.png)
+
+![月视图](assets/screenshot-month.png)
+
+![季度 / 年度视图](assets/screenshot-quarter-year.png)
 
 ## 安装
 

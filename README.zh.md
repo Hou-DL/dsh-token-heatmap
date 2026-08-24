@@ -42,3 +42,12 @@ nohup dsh web > /tmp/dsh-web.log 2>&1 &
 | **更多** | 右上角 ⋯ 菜单里有「重置历史」 |
 
 详见 [README.md](./README.md)。
+
+
+## 截图
+
+![周视图](assets/screenshot-week.png)
+
+![月视图](assets/screenshot-month.png)
+
+![季度 / 年度视图](assets/screenshot-quarter-year.png)

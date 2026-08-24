@@ -10,7 +10,13 @@ A settings-pane-only local Token heatmap plugin for DSH Web, styled after the Gi
 - **Stats** — Today / This week / This month / All time
 - **Top 5** — by Model and by Provider, recomputed per view; click a day to scope Top 5 to that day
 
-![overview](https://placehold.co/720x420?text=dsh-token-heatmap%20UI)
+## Screenshots
+
+![Week view](assets/screenshot-week.png)
+
+![Month view](assets/screenshot-month.png)
+
+![Quarter / Year view](assets/screenshot-quarter-year.png)
 
 ## Install
 
