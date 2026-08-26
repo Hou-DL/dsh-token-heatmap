@@ -56,6 +56,7 @@ function buildHourLevels(days: DayAgg[]): Map<string, number[]> {
 }
 
 function formatTokensShort(n: number): string {
+  if (n >= 1_000_000_000) return (n / 1_000_000_000).toFixed(2) + "B";
   if (n >= 1_000_000) return (n / 1_000_000).toFixed(2) + "M";
   if (n >= 1000) return (n / 1000).toFixed(2) + "k";
   return n.toLocaleString();
