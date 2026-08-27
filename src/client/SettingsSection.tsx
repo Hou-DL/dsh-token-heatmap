@@ -41,7 +41,9 @@ export function SettingsSection({ t, ctx, days: injectedDays, totals: injectedTo
   // 弹出式设置窗口（⋯ 打开），点遮罩/完成关闭；内部不再互相退出
   const [settingsOpen, setSettingsOpen] = React.useState(false);
   const applyThresholdsM = (highM: number, lowM: number) => {
-    setThresholds({ high: Math.max(0, highM) * 1_000_000, low: Math.max(0, lowM) * 1_000_000 });
+    const next = { high: Math.max(0, highM) * 1_000_000, low: Math.max(0, lowM) * 1_000_000 };
+    setThresholds(next);
+    try { localStorage.setItem(LS_TH_KEY, JSON.stringify(next)); } catch {}   // ← was missing: edits never persisted
   };
   const thInM = { high: thresholds.high / 1_000_000, low: thresholds.low / 1_000_000 };
   const applyThresholds = (t: LevelThresholds) => {
