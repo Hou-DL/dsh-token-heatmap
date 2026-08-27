@@ -204,8 +204,7 @@ export function SettingsSection({ t, ctx, days: injectedDays, totals: injectedTo
             style={{
               position: "fixed", inset: 0, zIndex: 50,
               background: "rgba(0,0,0,0.35)",
-              display: "flex", alignItems: "flex-start", justifyContent: "center",
-              paddingTop: 80,
+              display: "flex", alignItems: "center", justifyContent: "center",
             }}
           >
             <div
@@ -227,7 +226,16 @@ export function SettingsSection({ t, ctx, days: injectedDays, totals: injectedTo
                 <span style={{ fontSize: 14, fontWeight: 600, color: "var(--dsw-alias-label-primary)" }}>
                   {lang === "en" ? "Heatmap Settings" : "热图设置"}
                 </span>
-                <button onClick={() => setSettingsOpen(false)} style={{ border: "none", background: "transparent", fontSize: 16, cursor: "pointer", color: "var(--dsw-alias-label-tertiary)" }}>✕</button>
+                <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                  <button
+                    onClick={() => { if (confirm(lang === "en" ? "Reset all historical data? This cannot be undone." : "确定重置所有历史数据？此操作不可撤销。")) { handleReset(); } }}
+                    title={lang === "en" ? "Reset history (advanced)" : "重置历史（高级）"}
+                    style={{ border: "none", background: "transparent", fontSize: 11, cursor: "pointer", color: "var(--dsw-alias-label-tertiary)", opacity: 0.55, textDecoration: "underline" }}
+                  >
+                    {lang === "en" ? "Reset history…" : "重置历史…"}
+                  </button>
+                  <button onClick={() => setSettingsOpen(false)} aria-label="close" style={{ border: "none", background: "transparent", fontSize: 16, cursor: "pointer", color: "var(--dsw-alias-label-tertiary)" }}>✕</button>
+                </div>
               </div>
 
               {/* 分档阈值 */}
@@ -260,13 +268,6 @@ export function SettingsSection({ t, ctx, days: injectedDays, totals: injectedTo
                   <span style={{ fontSize: 10, color: "var(--dsw-alias-label-tertiary)" }}>0 = off</span>
                 </div>
               </div>
-
-              <div style={{ borderTop: "1px solid var(--dsw-alias-border-l2)" }} />
-
-              {/* 重置历史 */}
-              <button onClick={handleReset} style={{ width: "100%", padding: "8px 10px", fontSize: 12, borderRadius: 6, border: "1px solid var(--dsw-alias-state-error-primary, #e5484d)", background: "transparent", color: "var(--dsw-alias-state-error-primary, #e5484d)", cursor: "pointer", textAlign: "left" }}>
-                {lang === "en" ? "Reset history" : t("heatmap.reset")}
-              </button>
 
               <button onClick={() => setSettingsOpen(false)} style={{ width: "100%", padding: "8px 10px", fontSize: 13, borderRadius: 8, border: "1px solid var(--dsw-alias-border-l2)", background: "var(--dsw-alias-bg-layer-3)", color: "var(--dsw-alias-label-primary)", cursor: "pointer" }}>
                 {lang === "en" ? "Done" : "完成"}
