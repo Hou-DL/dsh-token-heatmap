@@ -45,6 +45,7 @@ export function apply(ctx: any) {
           }));
           const body = JSON.stringify({
             version: 1 as const,
+            ready: store.isReady(),
             totals: agg.totals,
             topModels: agg.topModels.map((x) => ({ name: x.model, tokens: x.tokens })),
             topProviders: agg.topProviders.map((x) => ({ name: x.provider, tokens: x.tokens })),

@@ -106,6 +106,12 @@ export class HeatmapStore {
     return this.cachedAgg;
   }
 
+  /** True once the full disk scan (init) has completed. Exposed to API consumers
+   *  so partial data can be distinguished from "still loading". */
+  isReady(): boolean {
+    return this.initialized;
+  }
+
   private invalidateCache() {
     this.cachedAgg = null;
     this.cachedAt = 0;

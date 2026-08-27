@@ -32,6 +32,9 @@ async function fetchFromApi(): Promise<Aggregated | null> {
     if (!res.ok) return null;
     const json = await res.json();
     if (!json || !Array.isArray(json.days)) return null;
+    // Host still scanning disk (init in progress): signal "not ready" so the
+    // caller retries shortly instead of caching a partial snapshot.
+    if ((json as any).ready === false) return { __notReady: true } as any;
     const byDay = new Map<string, DayAgg>();
     for (const d of json.days) {
       byDay.set(d.dayKey, {
@@ -101,15 +104,15 @@ export function useHeatmapData(ctx: any | null, refreshMs?: number, manualTick?:
     setRefreshing(true);
     try {
       const apiData = await fetchFromApi();
-      if (apiData) {
-        const isEmpty = apiData.byDay.size === 0;
+      if (apiData && !(apiData as any).__notReady) {
         setData(apiData);
         setLastRefresh(new Date().toLocaleString());
-        // If the host hasn't finished init() (empty data), retry shortly
-        // instead of waiting for the next 10-min auto-refresh cycle.
-        if (isEmpty) {
-          setTimeout(() => { setTick((t) => t + 1); }, 3000);
-        }
+        return;
+      }
+      if (apiData && (apiData as any).__notReady) {
+        // Host init still scanning disk: retry shortly; keep old data showing
+        setTimeout(() => { setTick((t) => t + 1); }, 2000);
+        setRefreshing(false);
         return;
       }
       const store = ctx?.get?.("heatmapStore") ?? (typeof window !== "undefined" ? (window as any).__dsh_heatmapStore : null);
