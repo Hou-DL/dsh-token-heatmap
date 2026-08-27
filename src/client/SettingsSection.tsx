@@ -2,7 +2,7 @@ declare const __PLUGIN_VERSION__: string;
 
 import * as React from "react";
 import { StatsCards } from "./StatsCards.tsx";
-import { HeatmapGrid, type ViewKind } from "./HeatmapGrid.tsx";
+import { HeatmapGrid, type ViewKind, type LevelThresholds, DEFAULT_THRESHOLDS } from "./HeatmapGrid.tsx";
 import { ModelTop5 } from "./ModelTop5.tsx";
 import { useHeatmapData, useHeatmapView, getAutoRefreshMinutes, setAutoRefreshMinutes } from "./hooks.ts";
 import type { DayAgg } from "../aggregation.ts";
@@ -25,6 +25,23 @@ export function SettingsSection({ t, ctx, days: injectedDays, totals: injectedTo
   const [lang, setLang] = React.useState<"zh" | "en">(() => {
     try { const v = localStorage.getItem("dsh-token-heatmap:lang"); return v === "en" ? "en" : "zh"; } catch { return "zh"; }
   });
+  // 分档阈值设置：>= high 恒为深绿(4档)，< low 恒为浅绿(1档)；localStorage 持久化
+  const LS_TH_KEY = "dsh-token-heatmap:thresholds";
+  const [thresholds, setThresholds] = React.useState<LevelThresholds>(() => {
+    try {
+      const raw = localStorage.getItem(LS_TH_KEY);
+      if (!raw) return DEFAULT_THRESHOLDS;
+      const parsed = JSON.parse(raw);
+      const high = Number(parsed?.high) || 0;
+      const low = Number(parsed?.low) || 0;
+      return { high: Math.max(0, high), low: Math.max(0, low) };
+    } catch { return DEFAULT_THRESHOLDS; }
+  });
+  const [thOpen, setThOpen] = React.useState(false); // ⋯ 菜单里的「分档阈值」子面板开关
+  const applyThresholds = (t: LevelThresholds) => {
+    setThresholds(t);
+    try { localStorage.setItem(LS_TH_KEY, JSON.stringify(t)); } catch {}
+  };
   // ⋯ 菜单：显式开关 + 点击外部自动收回
   const [menuOpen, setMenuOpen] = React.useState(false);
   const menuRef = React.useRef<HTMLDivElement | null>(null);
@@ -187,9 +204,39 @@ export function SettingsSection({ t, ctx, days: injectedDays, totals: injectedTo
           >⋯</button>
           {menuOpen ? (
             <div
-              style={{ position: "absolute", right: 0, top: "100%", zIndex: 10, background: "var(--dsw-alias-bg-layer-3)", border: "1px solid var(--dsw-alias-border-l2)", borderRadius: 8, padding: 6, minWidth: 120, boxShadow: "0 4px 12px rgba(0,0,0,0.12)" }}
+              style={{ position: "absolute", right: 0, top: "100%", zIndex: 10, background: "var(--dsw-alias-bg-layer-3)", border: "1px solid var(--dsw-alias-border-l2)", borderRadius: 8, padding: 6, minWidth: 210, boxShadow: "0 4px 12px rgba(0,0,0,0.12)" }}
               onClick={(e) => { e.stopPropagation(); setMenuOpen(false); }}
             >
+              <button onClick={() => { setThOpen((o) => !o); }} style={{ width: "100%", padding: "6px 10px", fontSize: 12, borderRadius: 6, border: "none", background: "transparent", color: "var(--dsw-alias-label-primary)", cursor: "pointer", textAlign: "left", display: "flex", justifyContent: "space-between" }}>
+                <span>{lang === "en" ? "Level thresholds" : "分档阈值"}</span>
+                <span style={{ color: "var(--dsw-alias-label-tertiary)" }}>{thOpen ? "▾" : "▸"}</span>
+              </button>
+              {thOpen ? (
+                <div style={{ padding: "4px 10px 8px", display: "flex", flexDirection: "column", gap: 6 }}>
+                  {([
+                    { key: "high" as const, label: lang === "en" ? "Deep green ≥ (tokens)" : "深绿阈值 ≥（tokens）" },
+                    { key: "low" as const, label: lang === "en" ? "Light green < (tokens)" : "浅绿阈值 <（tokens）" },
+                  ]).map(({ key, label }) => (
+                    <label key={key} style={{ display: "flex", flexDirection: "column", gap: 2, fontSize: 11, color: "var(--dsw-alias-label-secondary)" }}>
+                      {label}
+                      <input
+                        type="number"
+                        min={0}
+                        step={1_000_000}
+                        value={thresholds[key]}
+                        onChange={(e) => applyThresholds({ ...thresholds, [key]: Math.max(0, Number(e.target.value) || 0) })}
+                        placeholder="0 = off"
+                        style={{ padding: "4px 8px", fontSize: 12, borderRadius: 6, border: "1px solid var(--dsw-alias-border-l2)", background: "var(--dsw-alias-bg-layer-3)", color: "var(--dsw-alias-label-primary)" }}
+                      />
+                    </label>
+                  ))}
+                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                    <button onClick={() => applyThresholds(DEFAULT_THRESHOLDS)} style={{ padding: "3px 8px", fontSize: 11, borderRadius: 5, border: "1px solid var(--dsw-alias-border-l2)", background: "var(--dsw-alias-bg-layer-3)", cursor: "pointer" }}>{lang === "en" ? "Defaults" : "恢复默认"}</button>
+                    <span style={{ fontSize: 10, color: "var(--dsw-alias-label-tertiary)" }}>0 = off</span>
+                  </div>
+                </div>
+              ) : null}
+              <div style={{ borderTop: "1px solid var(--dsw-alias-border-l2)", margin: "4px 0" }} />
               <button onClick={handleReset} style={{ width: "100%", padding: "6px 10px", fontSize: 12, borderRadius: 6, border: "none", background: "transparent", color: "var(--dsw-alias-state-error-primary, #e5484d)", cursor: "pointer", textAlign: "left" }}>{lang === "en" ? "Reset history" : t("heatmap.reset")}</button>
             </div>
           ) : null}
@@ -208,7 +255,7 @@ export function SettingsSection({ t, ctx, days: injectedDays, totals: injectedTo
       ) : null}
 
       {totals ? <StatsCards t={lang === "en" ? (k:string,p?:any)=> { const enMap:Record<string,string>={"stats.today":"Today","stats.week":"This week","stats.month":"This month","stats.all":"All time"}; if(k==="stats.count") return `${p?.count ?? ""} turns`; return (enMap as any)[k] ?? t(k,p); } : t} totals={totals} todayCount={undefined} /> : null}
-      {days ? <HeatmapGrid t={lang === "en" ? (k:string,p?:any)=> { const enM:Record<string,string>={"view.week":"Week","view.month":"Month","view.quarter":"Quarter","view.year":"Year","heatmap.legend.less":"Less","heatmap.legend.more":"More","heatmap.empty":"No data yet","heatmap.tooltip.none":"No usage","heatmap.subtitle":"Token usage from local session logs, bucketed by Asia/Shanghai. First sync is persisted — deleting sessions keeps history.","heatmap.title":"Token Heatmap"}; return (enM as any)[k] ?? t(k,p); } : t} days={days} view={view} onViewChange={handleViewChange} selectedKey={selectedKey} onSelect={handleSelect} isEn={lang === "en"} /> : null}
+      {days ? <HeatmapGrid t={lang === "en" ? (k:string,p?:any)=> { const enM:Record<string,string>={"view.week":"Week","view.month":"Month","view.quarter":"Quarter","view.year":"Year","heatmap.legend.less":"Less","heatmap.legend.more":"More","heatmap.empty":"No data yet","heatmap.tooltip.none":"No usage","heatmap.subtitle":"Token usage from local session logs, bucketed by Asia/Shanghai. First sync is persisted — deleting sessions keeps history.","heatmap.title":"Token Heatmap"}; return (enM as any)[k] ?? t(k,p); } : t} days={days} view={view} onViewChange={handleViewChange} selectedKey={selectedKey} onSelect={handleSelect} isEn={lang === "en"} thresholds={thresholds} /> : null}
       {selectedKey ? (
         <div style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 12, color: "var(--dsw-alias-label-secondary)" }}>
           <span>{tt("heatmap.dayDetail")}</span>

@@ -5,12 +5,19 @@ export type ViewKind = "week" | "month" | "quarter" | "year";
 
 const VIEW_ORDER: ViewKind[] = ["week", "month", "quarter", "year"];
 
+/** Thresholds (tokens/day). Above HIGH always level 4; below LOW always level 1;
+ *  the band in between uses percentile ranking. Configurable in the ⋯ menu. */
+export type LevelThresholds = { high: number; low: number };
+
+export const DEFAULT_THRESHOLDS: LevelThresholds = { high: 100_000_000, low: 10_000_000 };
+
 /**
  * Build a rank-based (percentile) level map for a day-window, keyed by dayKey.
  * Outlier-proof: a single huge day no longer flattens the rest of the window
  * to level 1. Falls back to log-scaled ratio when non-zero days are too few.
+ * Absolute thresholds override ranking: >= high -> always 4, < low -> always 1.
  */
-function buildDayLevels(days: DayAgg[]): Map<string, number> {
+function buildDayLevels(days: DayAgg[], th: LevelThresholds): Map<string, number> {
   const nonZero = days
     .filter((d) => d.totalTokens > 0)
     .map((d) => d.totalTokens)
@@ -20,6 +27,8 @@ function buildDayLevels(days: DayAgg[]): Map<string, number> {
   for (const d of days) {
     let level: number;
     if (d.totalTokens <= 0) level = 0;
+    else if (th.high > 0 && d.totalTokens >= th.high) level = 4;      // absolute deep green
+    else if (th.low > 0 && d.totalTokens < th.low) level = 1;          // absolute light green
     else if (nonZero.length < MIN_RANK_POINTS) level = logLevel(d.totalTokens, viewMax);
     else level = levelByRank(d.totalTokens, nonZero);
     map.set(d.dayKey, level);
@@ -29,9 +38,9 @@ function buildDayLevels(days: DayAgg[]): Map<string, number> {
 
 /**
  * Build rank-based level arrays for hour bars across a week (cross-day comparable).
- * Maps dayKey -> number[24] of levels.
+ * Maps dayKey -> number[24] of levels. Same absolute-threshold overrides as days.
  */
-function buildHourLevels(days: DayAgg[]): Map<string, number[]> {
+function buildHourLevels(days: DayAgg[], th: LevelThresholds): Map<string, number[]> {
   const nonZero: number[] = [];
   const raw = new Map<string, number[]>();
   for (const d of days) {
@@ -47,6 +56,8 @@ function buildHourLevels(days: DayAgg[]): Map<string, number[]> {
       k,
       h.map((v) => {
         if (v <= 0) return 0;
+        if (th.high > 0 && v >= th.high) return 4;
+        if (th.low > 0 && v < th.low) return 1;
         if (nonZero.length < MIN_RANK_POINTS) return logLevel(v, weekMax);
         return levelByRank(v, nonZero);
       }),
@@ -355,6 +366,7 @@ export function HeatmapGrid({
   selectedKey,
   onSelect,
   isEn,
+  thresholds = DEFAULT_THRESHOLDS,
 }: {
   t: (k: string, p?: any) => string;
   days: DayAgg[];
@@ -363,11 +375,12 @@ export function HeatmapGrid({
   selectedKey?: string | null;
   onSelect?: (k: string | null) => void;
   isEn?: boolean;
+  thresholds?: LevelThresholds;
 }) {
   const isWeek = view === "week";
   const hasAny = days.some((d) => d.totalTokens > 0);
-  const dayLevels = buildDayLevels(days);
-  const hourLevels = buildHourLevels(days);
+  const dayLevels = buildDayLevels(days, thresholds);
+  const hourLevels = buildHourLevels(days, thresholds);
   const cellSize = isWeek ? 16 : view === "quarter" ? 23 : (view === "year" ? 14 : 14);
 
   const handleViewChange = (v: ViewKind) => {
