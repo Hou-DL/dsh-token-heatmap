@@ -25,7 +25,8 @@ export function SettingsSection({ t, ctx, days: injectedDays, totals: injectedTo
   const [lang, setLang] = React.useState<"zh" | "en">(() => {
     try { const v = localStorage.getItem("dsh-token-heatmap:lang"); return v === "en" ? "en" : "zh"; } catch { return "zh"; }
   });
-  // 分档阈值设置：>= high 恒为深绿(4档)，< low 恒为浅绿(1档)；localStorage 持久化
+  // 分档阈值设置：>= high 恒为深绿(4档)，< low 恒为浅绿(1档)；localStorage 持久化（tokens）
+  // UI 上以 M tokens 为单位显示与输入
   const LS_TH_KEY = "dsh-token-heatmap:thresholds";
   const [thresholds, setThresholds] = React.useState<LevelThresholds>(() => {
     try {
@@ -37,22 +38,17 @@ export function SettingsSection({ t, ctx, days: injectedDays, totals: injectedTo
       return { high: Math.max(0, high), low: Math.max(0, low) };
     } catch { return DEFAULT_THRESHOLDS; }
   });
-  const [thOpen, setThOpen] = React.useState(false); // ⋯ 菜单里的「分档阈值」子面板开关
+  // 弹出式设置窗口（⋯ 打开），点遮罩/完成关闭；内部不再互相退出
+  const [settingsOpen, setSettingsOpen] = React.useState(false);
+  const applyThresholdsM = (highM: number, lowM: number) => {
+    setThresholds({ high: Math.max(0, highM) * 1_000_000, low: Math.max(0, lowM) * 1_000_000 });
+  };
+  const thInM = { high: thresholds.high / 1_000_000, low: thresholds.low / 1_000_000 };
   const applyThresholds = (t: LevelThresholds) => {
     setThresholds(t);
     try { localStorage.setItem(LS_TH_KEY, JSON.stringify(t)); } catch {}
   };
   // ⋯ 菜单：显式开关 + 点击外部自动收回
-  const [menuOpen, setMenuOpen] = React.useState(false);
-  const menuRef = React.useRef<HTMLDivElement | null>(null);
-  React.useEffect(() => {
-    if (!menuOpen) return;
-    const onDown = (e: MouseEvent) => {
-      if (menuRef.current && !menuRef.current.contains(e.target as Node)) setMenuOpen(false);
-    };
-    document.addEventListener("mousedown", onDown);
-    return () => document.removeEventListener("mousedown", onDown);
-  }, [menuOpen]);
 
   const days = injectedDays ?? computedDays;
   const totals = injectedTotals ?? aggregated?.totals;
@@ -195,52 +191,89 @@ export function SettingsSection({ t, ctx, days: injectedDays, totals: injectedTo
             <option value={60}>60 min</option>
           </select>
         </label>
-        <div style={{ position: "relative" }} ref={menuRef}>
-          <button
-            onClick={(e) => { e.stopPropagation(); setMenuOpen((o) => !o); }}
-            aria-haspopup="menu"
-            aria-expanded={menuOpen}
-            style={{ listStyle: "none", cursor: "pointer", padding: "2px 8px", fontSize: 13, color: "var(--dsw-alias-label-tertiary)", opacity: 0.7, border: "none", background: "transparent" }}
-          >⋯</button>
-          {menuOpen ? (
+        <button
+          onClick={() => setSettingsOpen(true)}
+          aria-haspopup="dialog"
+          style={{ listStyle: "none", cursor: "pointer", padding: "2px 8px", fontSize: 13, color: "var(--dsw-alias-label-tertiary)", opacity: 0.7, border: "none", background: "transparent" }}
+          title={lang === "en" ? "Settings" : "设置"}
+        >⋯</button>
+
+        {settingsOpen ? (
+          <div
+            onClick={() => setSettingsOpen(false)}   // 点遮罩关闭
+            style={{
+              position: "fixed", inset: 0, zIndex: 50,
+              background: "rgba(0,0,0,0.35)",
+              display: "flex", alignItems: "flex-start", justifyContent: "center",
+              paddingTop: 80,
+            }}
+          >
             <div
-              style={{ position: "absolute", right: 0, top: "100%", zIndex: 10, background: "var(--dsw-alias-bg-layer-3)", border: "1px solid var(--dsw-alias-border-l2)", borderRadius: 8, padding: 6, minWidth: 210, boxShadow: "0 4px 12px rgba(0,0,0,0.12)" }}
-              onClick={(e) => { e.stopPropagation(); setMenuOpen(false); }}
+              role="dialog"
+              aria-modal="true"
+              onClick={(e) => e.stopPropagation()}     // 内容区阻止冒泡，不关窗
+              style={{
+                background: "var(--dsw-alias-bg-layer-3)",
+                border: "1px solid var(--dsw-alias-border-l2)",
+                borderRadius: 12,
+                minWidth: 340,
+                maxWidth: "90vw",
+                boxShadow: "0 8px 24px rgba(0,0,0,0.2)",
+                padding: 16,
+                display: "flex", flexDirection: "column", gap: 12,
+              }}
             >
-              <button onClick={() => { setThOpen((o) => !o); }} style={{ width: "100%", padding: "6px 10px", fontSize: 12, borderRadius: 6, border: "none", background: "transparent", color: "var(--dsw-alias-label-primary)", cursor: "pointer", textAlign: "left", display: "flex", justifyContent: "space-between" }}>
-                <span>{lang === "en" ? "Level thresholds" : "分档阈值"}</span>
-                <span style={{ color: "var(--dsw-alias-label-tertiary)" }}>{thOpen ? "▾" : "▸"}</span>
-              </button>
-              {thOpen ? (
-                <div style={{ padding: "4px 10px 8px", display: "flex", flexDirection: "column", gap: 6 }}>
-                  {([
-                    { key: "high" as const, label: lang === "en" ? "Deep green ≥ (tokens)" : "深绿阈值 ≥（tokens）" },
-                    { key: "low" as const, label: lang === "en" ? "Light green < (tokens)" : "浅绿阈值 <（tokens）" },
-                  ]).map(({ key, label }) => (
-                    <label key={key} style={{ display: "flex", flexDirection: "column", gap: 2, fontSize: 11, color: "var(--dsw-alias-label-secondary)" }}>
-                      {label}
-                      <input
-                        type="number"
-                        min={0}
-                        step={1_000_000}
-                        value={thresholds[key]}
-                        onChange={(e) => applyThresholds({ ...thresholds, [key]: Math.max(0, Number(e.target.value) || 0) })}
-                        placeholder="0 = off"
-                        style={{ padding: "4px 8px", fontSize: 12, borderRadius: 6, border: "1px solid var(--dsw-alias-border-l2)", background: "var(--dsw-alias-bg-layer-3)", color: "var(--dsw-alias-label-primary)" }}
-                      />
-                    </label>
-                  ))}
-                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-                    <button onClick={() => applyThresholds(DEFAULT_THRESHOLDS)} style={{ padding: "3px 8px", fontSize: 11, borderRadius: 5, border: "1px solid var(--dsw-alias-border-l2)", background: "var(--dsw-alias-bg-layer-3)", cursor: "pointer" }}>{lang === "en" ? "Defaults" : "恢复默认"}</button>
-                    <span style={{ fontSize: 10, color: "var(--dsw-alias-label-tertiary)" }}>0 = off</span>
-                  </div>
+              <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+                <span style={{ fontSize: 14, fontWeight: 600, color: "var(--dsw-alias-label-primary)" }}>
+                  {lang === "en" ? "Heatmap Settings" : "热图设置"}
+                </span>
+                <button onClick={() => setSettingsOpen(false)} style={{ border: "none", background: "transparent", fontSize: 16, cursor: "pointer", color: "var(--dsw-alias-label-tertiary)" }}>✕</button>
+              </div>
+
+              {/* 分档阈值 */}
+              <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+                <div style={{ fontSize: 12, fontWeight: 600, color: "var(--dsw-alias-label-secondary)" }}>
+                  {lang === "en" ? "Level thresholds (M tokens)" : "分档阈值（M tokens）"}
                 </div>
-              ) : null}
-              <div style={{ borderTop: "1px solid var(--dsw-alias-border-l2)", margin: "4px 0" }} />
-              <button onClick={handleReset} style={{ width: "100%", padding: "6px 10px", fontSize: 12, borderRadius: 6, border: "none", background: "transparent", color: "var(--dsw-alias-state-error-primary, #e5484d)", cursor: "pointer", textAlign: "left" }}>{lang === "en" ? "Reset history" : t("heatmap.reset")}</button>
+                {([
+                  { key: "high" as const, label: lang === "en" ? "Deep green ≥ (M)" : "深绿阈值 ≥（M）" },
+                  { key: "low" as const, label: lang === "en" ? "Light green < (M)" : "浅绿阈值 <（M）" },
+                ]).map(({ key, label }) => (
+                  <label key={key} style={{ display: "flex", flexDirection: "column", gap: 2, fontSize: 11, color: "var(--dsw-alias-label-secondary)" }}>
+                    {label}
+                    <input
+                      type="number"
+                      min={0}
+                      step={10}
+                      value={thInM[key]}
+                      onChange={(e) => applyThresholdsM(
+                        key === "high" ? Math.max(0, Number(e.target.value) || 0) : thInM.high,
+                        key === "low" ? Math.max(0, Number(e.target.value) || 0) : thInM.low,
+                      )}
+                      placeholder="0 = off"
+                      style={{ padding: "6px 10px", fontSize: 13, borderRadius: 6, border: "1px solid var(--dsw-alias-border-l2)", background: "var(--dsw-alias-bg-layer-3)", color: "var(--dsw-alias-label-primary)" }}
+                    />
+                  </label>
+                ))}
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                  <button onClick={() => applyThresholds(DEFAULT_THRESHOLDS)} style={{ padding: "4px 10px", fontSize: 11, borderRadius: 5, border: "1px solid var(--dsw-alias-border-l2)", background: "var(--dsw-alias-bg-layer-3)", cursor: "pointer" }}>{lang === "en" ? "Defaults (100M / 10M)" : "恢复默认（100M / 10M）"}</button>
+                  <span style={{ fontSize: 10, color: "var(--dsw-alias-label-tertiary)" }}>0 = off</span>
+                </div>
+              </div>
+
+              <div style={{ borderTop: "1px solid var(--dsw-alias-border-l2)" }} />
+
+              {/* 重置历史 */}
+              <button onClick={handleReset} style={{ width: "100%", padding: "8px 10px", fontSize: 12, borderRadius: 6, border: "1px solid var(--dsw-alias-state-error-primary, #e5484d)", background: "transparent", color: "var(--dsw-alias-state-error-primary, #e5484d)", cursor: "pointer", textAlign: "left" }}>
+                {lang === "en" ? "Reset history" : t("heatmap.reset")}
+              </button>
+
+              <button onClick={() => setSettingsOpen(false)} style={{ width: "100%", padding: "8px 10px", fontSize: 13, borderRadius: 8, border: "1px solid var(--dsw-alias-border-l2)", background: "var(--dsw-alias-bg-layer-3)", color: "var(--dsw-alias-label-primary)", cursor: "pointer" }}>
+                {lang === "en" ? "Done" : "完成"}
+              </button>
             </div>
-          ) : null}
-        </div>
+          </div>
+        ) : null}
       </div>
 
       {view === "week" || view === "month" ? (
