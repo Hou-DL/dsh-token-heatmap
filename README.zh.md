@@ -1,4 +1,4 @@
-# dsh-token-heatmap
+# dsh-token-pulse
 
 本地 Token 用量热图插件，GitHub 风格日历视图，内置于 DSH Web 设置页。
 
@@ -11,9 +11,9 @@
 
 ```bash
 # 从 GitHub
-dsh plugin --profile web add github:Hou-DL/dsh-token-heatmap
+dsh plugin --profile web add github:Hou-DL/dsh-token-pulse
 # 或从 Gitee
-dsh plugin --profile web add "git+https://gitee.com/HouDL/dsh-token-heatmap.git"
+dsh plugin --profile web add "git+https://gitee.com/HouDL/dsh-token-pulse.git"
 ```
 
 重启后打开 **设置 → Token Heatmap**。

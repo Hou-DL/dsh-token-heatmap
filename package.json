@@ -1,8 +1,17 @@
 {
-  "name": "dsh-token-heatmap",
-  "version": "0.1.5-beta",
+  "name": "dsh-token-pulse",
+  "version": "0.2.0-beta",
   "type": "module",
   "description": "设置内独立栏的本地 Token 热图：周/月/季度/年视图 + 日周月总统计 + 按模型/供应商 Top5",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Hou-DL/dsh-token-pulse.git"
+  },
+  "homepage": "https://github.com/Hou-DL/dsh-token-pulse#readme",
+  "publishConfig": {
+    "registry": "https://registry.npmjs.org",
+    "access": "public"
+  },
   "main": "lib/index.mjs",
   "exports": {
     ".": {

@@ -1,6 +1,6 @@
 import { HeatmapStore } from "./host/store.ts";
 
-export const name = "dsh-token-heatmap";
+export const name = "dsh-token-pulse";
 export const inject = ["sessions"] as const;
 
 export function apply(ctx: any) {
@@ -11,7 +11,7 @@ export function apply(ctx: any) {
   let disposed = false;
 
   store.init().catch((e: unknown) => {
-    ctx.logger?.warn?.(`dsh-token-heatmap init failed: ${String(e)}`);
+    ctx.logger?.warn?.(`dsh-token-pulse init failed: ${String(e)}`);
   });
 
   ctx.on("session/event", (session: any, event: any) => {
@@ -22,7 +22,7 @@ export function apply(ctx: any) {
 
   ctx.on("session/flush", () => {});
 
-  // Serve persisted data for browser client via /api/dsh-token-heatmap/daily.json
+  // Serve persisted data for browser client via /api/dsh-token-pulse/daily.json
   let unregisterRoute: (() => void) | null = null;
   ctx.inject(["webServer"], (wsCtx: any) => {
     try {
@@ -58,10 +58,10 @@ export function apply(ctx: any) {
           res.end(JSON.stringify({ error: String(e) }));
         }
       };
-      unregisterRoute = wsCtx.webServer.register({ kind: "exact", path: "/api/dsh-token-heatmap/daily.json", handler });
-      ctx.logger.info("dsh-token-heatmap: registered /api/dsh-token-heatmap/daily.json");
+      unregisterRoute = wsCtx.webServer.register({ kind: "exact", path: "/api/dsh-token-pulse/daily.json", handler });
+      ctx.logger.info("dsh-token-pulse: registered /api/dsh-token-pulse/daily.json");
     } catch (e) {
-      ctx.logger?.warn?.(`dsh-token-heatmap route register failed: ${String(e)}`);
+      ctx.logger?.warn?.(`dsh-token-pulse route register failed: ${String(e)}`);
     }
   });
 
@@ -71,8 +71,8 @@ export function apply(ctx: any) {
       store.dispose();
       if (unregisterRoute) try { unregisterRoute(); } catch {}
     },
-    "dsh-token-heatmap.dispose",
+    "dsh-token-pulse.dispose",
   );
 
-  ctx.logger.info("dsh-token-heatmap host up");
+  ctx.logger.info("dsh-token-pulse host up");
 }

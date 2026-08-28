@@ -1,4 +1,4 @@
-# dsh-token-heatmap
+# dsh-token-pulse
 
 > 中文版：见 [README.md](./README.md)
 
@@ -14,10 +14,10 @@ A local Token usage heatmap plugin for DSH Web — GitHub-style calendar views, 
 
 ```bash
 # From GitHub
-dsh plugin --profile web add github:Hou-DL/dsh-token-heatmap
+dsh plugin --profile web add github:Hou-DL/dsh-token-pulse
 
 # Or from Gitee (faster in China)
-dsh plugin --profile web add "git+https://gitee.com/HouDL/dsh-token-heatmap.git"
+dsh plugin --profile web add "git+https://gitee.com/HouDL/dsh-token-pulse.git"
 ```
 
 Restart, then open **Settings → Token Heatmap**. 

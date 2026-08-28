@@ -1,4 +1,4 @@
-import { mkdirSync, readFileSync, writeFileSync, existsSync, renameSync } from "node:fs";
+import { mkdirSync, readFileSync, writeFileSync, existsSync, renameSync, copyFileSync } from "node:fs";
 import { join, dirname } from "node:path";
 import { homedir } from "node:os";
 import type { DayAgg } from "../aggregation.ts";
@@ -24,16 +24,41 @@ export type PersistedFile = {
 };
 
 function persistPath(): string {
-  const dir = join(homedir(), ".dsh", "storages", "dsh-token-heatmap");
+  const dir = join(homedir(), ".dsh", "storages", "dsh-token-pulse");
   return join(dir, "daily.json");
+}
+
+/**
+ * One-time migration from the pre-rename identity `dsh-token-heatmap`.
+ * The plugin was renamed to `dsh-token-pulse` (to avoid a bare-name collision
+ * with an unrelated plugin in the awesome-dsh-plugin catalog). Existing users
+ * have their accumulated history under storages/dsh-token-heatmap/ and their
+ * settings under localStorage keys dsh-token-heatmap:*; without this they would
+ * see an empty heatmap after the update. Copy the persisted file forward the
+ * first time the new location is missing but the legacy one exists.
+ */
+let migrated = false;
+function migrateLegacyPersist(): void {
+  if (migrated) return;
+  migrated = true;
+  try {
+    const next = persistPath();
+    if (existsSync(next)) return;
+    const legacy = join(homedir(), ".dsh", "storages", "dsh-token-heatmap", "daily.json");
+    if (!existsSync(legacy)) return;
+    mkdirSync(dirname(next), { recursive: true });
+    copyFileSync(legacy, next);
+  } catch {
+    // best-effort: a failed migration must not break loading
+  }
 }
 
 function libDailyPath(): string | null {
   try {
-    // Host writes a second copy to the installed plugin's lib/ so browser can fetch via /plugins/dsh-token-heatmap/daily.json
+    // Host writes a second copy to the installed plugin's lib/ so browser can fetch via /plugins/dsh-token-pulse/daily.json
     const candidates = [
-      join(homedir(), ".dsh", "profiles", "web", "node_modules", "dsh-token-heatmap", "lib", "daily.json"),
-      join("/home/dell/testdsh/dsh-token-heatmap/lib/daily.json"),
+      join(homedir(), ".dsh", "profiles", "web", "node_modules", "dsh-token-pulse", "lib", "daily.json"),
+      join("/home/dell/testdsh/dsh-token-pulse/lib/daily.json"),
     ];
     for (const c of candidates) {
       try {
@@ -89,6 +114,7 @@ function fromPersistedDay(p: PersistedDay): DayAgg {
 
 export function loadPersisted(): Map<string, DayAgg> {
   try {
+    migrateLegacyPersist();
     const p = persistPath();
     if (!existsSync(p)) return new Map();
     const raw = readFileSync(p, "utf-8");
@@ -120,7 +146,7 @@ export function savePersisted(days: Map<string, DayAgg>): void {
     const tmp = p + ".tmp";
     writeFileSync(tmp, json, "utf-8");
     renameSync(tmp, p);
-    // Also write to lib/ for browser fetch via /plugins/dsh-token-heatmap/daily.json
+    // Also write to lib/ for browser fetch via /plugins/dsh-token-pulse/daily.json
     const libPath = libDailyPath();
     if (libPath) {
       try {
@@ -128,7 +154,7 @@ export function savePersisted(days: Map<string, DayAgg>): void {
       } catch {}
       // Also try the workspace copy for dev
       try {
-        const wsLib = join("/home/dell/testdsh/dsh-token-heatmap/lib/daily.json");
+        const wsLib = join("/home/dell/testdsh/dsh-token-pulse/lib/daily.json");
         if (wsLib !== libPath) writeFileSync(wsLib, json, "utf-8");
       } catch {}
     }

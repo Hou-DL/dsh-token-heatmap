@@ -2,14 +2,14 @@ import * as React from "react";
 import { SettingsSection } from "./SettingsSection.tsx";
 import { zh, en } from "./locales.ts";
 
-const NS = "dsh-token-heatmap";
+const NS = "dsh-token-pulse";
 
 export const inject = ["locale", "slots"] as const;
 
 // CSS: replace default gear with a heatmap/grid icon for this settings entry
 const NAV_CSS = `
-[data-dsh-token-heatmap-nav] > svg:first-child { display: none; }
-[data-dsh-token-heatmap-nav]::before {
+[data-dsh-token-pulse-nav] > svg:first-child { display: none; }
+[data-dsh-token-pulse-nav]::before {
   content: ''; flex: none; width: 16px; height: 16px; background: currentColor;
   -webkit-mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='24' height='24' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Crect x='3' y='3' width='7' height='7' rx='1'/%3E%3Crect x='14' y='3' width='7' height='7' rx='1'/%3E%3Crect x='3' y='14' width='7' height='7' rx='1'/%3E%3Crect x='14' y='14' width='7' height='7' rx='1'/%3E%3C/svg%3E") center / contain no-repeat;
   mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='24' height='24' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Crect x='3' y='3' width='7' height='7' rx='1'/%3E%3Crect x='14' y='3' width='7' height='7' rx='1'/%3E%3Crect x='3' y='14' width='7' height='7' rx='1'/%3E%3Crect x='14' y='14' width='7' height='7' rx='1'/%3E%3C/svg%3E") center / contain no-repeat;
@@ -18,7 +18,7 @@ const NAV_CSS = `
 
 function injectNavCss() {
   if (typeof document === "undefined") return;
-  const id = "dsh-token-heatmap-nav-css";
+  const id = "dsh-token-pulse-nav-css";
   if (document.getElementById(id)) return;
   const el = document.createElement("style");
   el.id = id;
@@ -33,18 +33,39 @@ function markNavRow() {
   const labels = ["Token Heatmap", "用量热图"];
   for (const label of labels) {
     const btn = [...document.querySelectorAll('button')].find((b) => b.textContent?.trim().includes(label));
-    if (btn) btn.setAttribute("data-dsh-token-heatmap-nav", "");
+    if (btn) btn.setAttribute("data-dsh-token-pulse-nav", "");
   }
   void nav;
 }
 
 let t_global: () => any = () => (k: string) => k;
 
+// One-time migration from the pre-rename `dsh-token-heatmap:*` localStorage
+// keys. The plugin was renamed to `dsh-token-pulse`; carry lang, thresholds
+// and auto-refresh forward so existing users keep their settings.
+function migrateLegacyLocalStorage() {
+  if (typeof localStorage === "undefined") return;
+  const pairs = [
+    ["dsh-token-heatmap:lang", "dsh-token-pulse:lang"],
+    ["dsh-token-heatmap:thresholds", "dsh-token-pulse:thresholds"],
+    ["dsh-token-heatmap:autoRefreshMinutes", "dsh-token-pulse:autoRefreshMinutes"],
+  ] as const;
+  for (const [from, to] of pairs) {
+    try {
+      if (localStorage.getItem(to) === null) {
+        const v = localStorage.getItem(from);
+        if (v !== null) localStorage.setItem(to, v);
+      }
+    } catch {}
+  }
+}
+
 export function apply(ctx: any) {
+  migrateLegacyLocalStorage();
   injectNavCss();
   ctx.effect(
     () => ctx.locale.register(NS, { zh, en }),
-    "dsh-token-heatmap: dictionaries",
+    "dsh-token-pulse: dictionaries",
   );
   const t = ctx.locale.bind(NS);
   t_global = () => t;

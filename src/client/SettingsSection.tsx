@@ -23,11 +23,11 @@ export function SettingsSection({ t, ctx, days: injectedDays, totals: injectedTo
   const [selectedKey, setSelectedKey] = React.useState<string | null>(null);
   const [intervalMins, setIntervalMins] = React.useState(() => getAutoRefreshMinutes());
   const [lang, setLang] = React.useState<"zh" | "en">(() => {
-    try { const v = localStorage.getItem("dsh-token-heatmap:lang"); return v === "en" ? "en" : "zh"; } catch { return "zh"; }
+    try { const v = localStorage.getItem("dsh-token-pulse:lang"); return v === "en" ? "en" : "zh"; } catch { return "zh"; }
   });
   // 分档阈值设置：>= high 恒为深绿(4档)，< low 恒为浅绿(1档)；localStorage 持久化（tokens）
   // UI 上以 M tokens 为单位显示与输入
-  const LS_TH_KEY = "dsh-token-heatmap:thresholds";
+  const LS_TH_KEY = "dsh-token-pulse:thresholds";
   const [thresholds, setThresholds] = React.useState<LevelThresholds>(() => {
     try {
       const raw = localStorage.getItem(LS_TH_KEY);
@@ -109,7 +109,7 @@ export function SettingsSection({ t, ctx, days: injectedDays, totals: injectedTo
   const handleLangChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
     const v = e.target.value as "zh" | "en";
     setLang(v);
-    try { localStorage.setItem("dsh-token-heatmap:lang", v); } catch {}
+    try { localStorage.setItem("dsh-token-pulse:lang", v); } catch {}
   };
 
   const handleReset = () => {

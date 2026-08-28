@@ -2,7 +2,7 @@ import * as React from "react";
 import { aggregate, type Aggregated, type DayAgg } from "../aggregation.ts";
 import { toDayKey } from "../date-bucket.ts";
 
-const LS_INTERVAL_KEY = "dsh-token-heatmap:autoRefreshMinutes";
+const LS_INTERVAL_KEY = "dsh-token-pulse:autoRefreshMinutes";
 
 export function getAutoRefreshMinutes(): number {
   try {
@@ -28,7 +28,7 @@ async function fetchFromApi(): Promise<Aggregated | null> {
   const ctrl = new AbortController();
   const timer = setTimeout(() => ctrl.abort(), API_TIMEOUT_MS);
   try {
-    const res = await fetch("/api/dsh-token-heatmap/daily.json", { cache: "no-store", signal: ctrl.signal });
+    const res = await fetch("/api/dsh-token-pulse/daily.json", { cache: "no-store", signal: ctrl.signal });
     if (!res.ok) return null;
     const json = await res.json();
     if (!json || !Array.isArray(json.days)) return null;
@@ -110,8 +110,9 @@ export function useHeatmapData(ctx: any | null, refreshMs?: number, manualTick?:
         return;
       }
       if (apiData && (apiData as any).__notReady) {
-        // Host init still scanning disk: retry shortly; keep old data showing
-        setTimeout(() => { setTick((t) => t + 1); }, 2000);
+        // Host init still scanning disk: retry shortly; keep old data showing.
+        // (self-reference to fetchData is fine — it's resolved in the closure.)
+        setTimeout(() => { void fetchData(); }, 2000);
         setRefreshing(false);
         return;
       }

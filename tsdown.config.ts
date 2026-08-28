@@ -1,4 +1,4 @@
-/** dsh-token-heatmap build: ESM host (Node) + official client bundle
+/** dsh-token-pulse build: ESM host (Node) + official client bundle
  *  (cjs wrapped in the `__ModuleLoader__` contract required by dsh-client-modules). */
 
 import { readFileSync } from "node:fs";
@@ -21,7 +21,7 @@ export default [
   },
   // Client-side bundle (single file served as /plugins/<id>/client.js)
   {
-    name: "dsh-token-heatmap/client",
+    name: "dsh-token-pulse/client",
     entry: { client: "src/client/index.ts" },
     outDir: "lib",
     format: "cjs",
@@ -33,7 +33,7 @@ export default [
     define: { __PLUGIN_VERSION__: JSON.stringify(pkg.version) },
     outputOptions: {
       entryFileNames: "client.js",
-      banner: 'window.__ModuleLoader__.load({ id: "dsh-token-heatmap", factory: (require) => {',
+      banner: 'window.__ModuleLoader__.load({ id: "dsh-token-pulse", factory: (require) => {',
       footer: "return module.exports; } });",
       intro: "var module = { exports: {} }; var exports = module.exports;",
     },

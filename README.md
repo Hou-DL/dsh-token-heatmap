@@ -1,4 +1,4 @@
-# dsh-token-heatmap
+# dsh-token-pulse
 
 > English: [README.en.md](./README.en.md)
 
@@ -14,10 +14,10 @@
 
 ```bash
 # 从 GitHub
-dsh plugin --profile web add github:Hou-DL/dsh-token-heatmap
+dsh plugin --profile web add github:Hou-DL/dsh-token-pulse
 
 # 或从 Gitee（国内访问更快）
-dsh plugin --profile web add "git+https://gitee.com/HouDL/dsh-token-heatmap.git"
+dsh plugin --profile web add "git+https://gitee.com/HouDL/dsh-token-pulse.git"
 ```
 
 重启后打开 **设置 → Token Heatmap** 即可。
