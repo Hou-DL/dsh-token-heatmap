@@ -95,8 +95,9 @@ export function SettingsSection({ t, ctx, days: injectedDays, totals: injectedTo
   };
 
   const handleRefresh = async () => {
+    // refresh() already pulls + updates the module cache; no setTick (which
+    // would trigger a second fetch).
     await refresh();
-    setTick((x) => x + 1);
   };
 
   const handleIntervalChange = (e: React.ChangeEvent<HTMLSelectElement>) => {

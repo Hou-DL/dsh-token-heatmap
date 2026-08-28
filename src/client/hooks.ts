@@ -89,14 +89,22 @@ async function fetchFromApi(): Promise<Aggregated | null> {
   }
 }
 
+// Module-level cache that survives SettingsSection remounts (opening the card
+// again unmounts/remounts the component, which used to reset state to null and
+// re-fetch — causing a blank flash on every open). Reopening now renders the
+// cached snapshot immediately; a real fetch only happens on the refresh button,
+// the auto-refresh interval, or the very first open when nothing is cached yet.
+let _cache: { agg: Aggregated; label: string } | null = null;
+
 export function useHeatmapData(ctx: any | null, refreshMs?: number, manualTick?: number) {
-  const [data, setData] = React.useState<Aggregated | null>(null);
+  const [data, setData] = React.useState<Aggregated | null>(() => _cache?.agg ?? null);
   const [refreshing, setRefreshing] = React.useState(false);
-  const [lastRefresh, setLastRefresh] = React.useState<string | null>(null);
+  const [lastRefresh, setLastRefresh] = React.useState<string | null>(() => _cache?.label ?? null);
   // M1 fix: track + cancel the notReady retry so an unmounted component can't
   // leave an orphan retry chain polling every 2s until the host reports ready.
   const cancelledRef = React.useRef(false);
   const retryTimerRef = React.useRef<ReturnType<typeof setTimeout> | null>(null);
+  const mountedRef = React.useRef(false);
 
   const intervalMs = React.useMemo(() => {
     if (refreshMs !== undefined) return refreshMs;
@@ -106,11 +114,16 @@ export function useHeatmapData(ctx: any | null, refreshMs?: number, manualTick?:
 
   const fetchData = React.useCallback(async () => {
     setRefreshing(true);
+    const commit = (agg: Aggregated) => {
+      const label = new Date().toLocaleString();
+      _cache = { agg, label };
+      setData(agg);
+      setLastRefresh(label);
+    };
     try {
       const apiData = await fetchFromApi();
       if (apiData && !(apiData as any).__notReady) {
-        setData(apiData);
-        setLastRefresh(new Date().toLocaleString());
+        commit(apiData);
         return;
       }
       if (apiData && (apiData as any).__notReady) {
@@ -128,26 +141,35 @@ export function useHeatmapData(ctx: any | null, refreshMs?: number, manualTick?:
       const store = ctx?.get?.("heatmapStore") ?? (typeof window !== "undefined" ? (window as any).__dsh_heatmapStore : null);
       if (store?.refresh) await store.refresh();
       if (store?.getAggregated) {
-        setData(store.getAggregated());
-        setLastRefresh(new Date().toLocaleString());
+        commit(store.getAggregated());
         return;
       }
       const snap = typeof window !== "undefined" ? (window as any).__dsh_heatmapSnapshot : null;
       if (snap?.byDay && snap?.totals) {
-        setData(snap);
-        setLastRefresh(new Date().toLocaleString());
+        commit(snap);
         return;
       }
     } catch {
-      // keep previous
+      // keep previous (and cache) on failure
     } finally {
       setRefreshing(false);
     }
-    setData((prev) => prev ?? aggregate([], Date.now()));
+    // No successful source this time: only fall back to an empty snapshot if we
+    // have nothing cached — never blank out a card that already has data.
+    if (!_cache) setData((prev) => prev ?? aggregate([], Date.now()));
   }, [ctx]);
 
+  // Fetch policy: only pull on mount when nothing is cached yet (first ever
+  // open). Any later `manualTick` change (refresh button / interval change /
+  // reset) triggers a fetch. Reopening with a warm cache shows it instantly.
   React.useEffect(() => {
-    fetchData();
+    if (!mountedRef.current) {
+      mountedRef.current = true;
+      if (!_cache) void fetchData();
+      return;
+    }
+    void fetchData();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [fetchData, manualTick]);
 
   // M1 fix: on (re)mount clear any cancelled flag from a previous cycle, and on
@@ -163,16 +185,13 @@ export function useHeatmapData(ctx: any | null, refreshMs?: number, manualTick?:
     };
   }, []);
 
+  // Auto-refresh only on the configured interval (no visibility-triggered
+  // refetch — per user request, refresh happens only on button + interval).
   React.useEffect(() => {
     if (intervalMs === 0) return;
     const id = setInterval(fetchData, intervalMs);
-    const onVis = () => {
-      if (document.visibilityState === "visible") fetchData();
-    };
-    document.addEventListener("visibilitychange", onVis);
     return () => {
       clearInterval(id);
-      document.removeEventListener("visibilitychange", onVis);
     };
   }, [fetchData, intervalMs]);
 
