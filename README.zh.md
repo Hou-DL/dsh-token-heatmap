@@ -16,7 +16,7 @@ dsh plugin --profile web add github:Hou-DL/dsh-token-pulse
 dsh plugin --profile web add "git+https://gitee.com/HouDL/dsh-token-pulse.git"
 ```
 
-重启后打开 **设置 → Token Heatmap**。
+重启后打开 **设置 → Token Pulse**。
 
 
 - **零网络、零计费**：只读本地会话日志

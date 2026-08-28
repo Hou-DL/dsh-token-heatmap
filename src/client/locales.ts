@@ -1,6 +1,6 @@
 export const zh: Record<string, string> = {
-  "nav": "Token Heatmap",
-  "heatmap.title": "Token Heatmap",
+  "nav": "Token Pulse",
+  "heatmap.title": "Token Pulse",
   "heatmap.subtitle": "基于本地会话日志统计 Token 用量，北京时间自然日分桶，零网络零计费。首次同步后持久化，删除会话不丢历史。",
   "heatmap.empty": "暂无用量数据，开始一次对话后这里会出现热图。",
   "heatmap.legend.less": "少",
@@ -38,8 +38,8 @@ export const zh: Record<string, string> = {
 };
 
 export const en: Record<string, string> = {
-  "nav": "Token Heatmap",
-  "heatmap.title": "Token Heatmap",
+  "nav": "Token Pulse",
+  "heatmap.title": "Token Pulse",
   "heatmap.subtitle": "Local token usage from session logs, bucketed by Asia/Shanghai, no network or billing. Synced once then persisted, surviving session deletion.",
   "heatmap.empty": "No usage yet. Start a conversation and the heatmap will appear here.",
   "heatmap.legend.less": "Less",

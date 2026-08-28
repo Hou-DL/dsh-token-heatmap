@@ -20,7 +20,7 @@ dsh plugin --profile web add github:Hou-DL/dsh-token-pulse
 dsh plugin --profile web add "git+https://gitee.com/HouDL/dsh-token-pulse.git"
 ```
 
-Restart, then open **Settings → Token Heatmap**. 
+Restart, then open **Settings → Token Pulse**. 
 
 - **Zero network, zero billing** — reads local session logs only, never touches billing/balance APIs
 - **Persistent** — history is stored on disk; deleting sessions never loses data

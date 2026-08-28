@@ -93,6 +93,10 @@ export function useHeatmapData(ctx: any | null, refreshMs?: number, manualTick?:
   const [data, setData] = React.useState<Aggregated | null>(null);
   const [refreshing, setRefreshing] = React.useState(false);
   const [lastRefresh, setLastRefresh] = React.useState<string | null>(null);
+  // M1 fix: track + cancel the notReady retry so an unmounted component can't
+  // leave an orphan retry chain polling every 2s until the host reports ready.
+  const cancelledRef = React.useRef(false);
+  const retryTimerRef = React.useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const intervalMs = React.useMemo(() => {
     if (refreshMs !== undefined) return refreshMs;
@@ -111,8 +115,13 @@ export function useHeatmapData(ctx: any | null, refreshMs?: number, manualTick?:
       }
       if (apiData && (apiData as any).__notReady) {
         // Host init still scanning disk: retry shortly; keep old data showing.
-        // (self-reference to fetchData is fine — it's resolved in the closure.)
-        setTimeout(() => { void fetchData(); }, 2000);
+        // Cancel any prior scheduled retry (prevents stacking chains when a
+        // manual refresh or interval fires while a retry is already pending),
+        // and skip scheduling if this instance has been unmounted (M1).
+        if (retryTimerRef.current) clearTimeout(retryTimerRef.current);
+        if (!cancelledRef.current) {
+          retryTimerRef.current = setTimeout(() => { void fetchData(); }, 2000);
+        }
         setRefreshing(false);
         return;
       }
@@ -140,6 +149,19 @@ export function useHeatmapData(ctx: any | null, refreshMs?: number, manualTick?:
   React.useEffect(() => {
     fetchData();
   }, [fetchData, manualTick]);
+
+  // M1 fix: on (re)mount clear any cancelled flag from a previous cycle, and on
+  // unmount mark cancelled + drop the pending retry so the chain terminates.
+  React.useEffect(() => {
+    cancelledRef.current = false;
+    return () => {
+      cancelledRef.current = true;
+      if (retryTimerRef.current) {
+        clearTimeout(retryTimerRef.current);
+        retryTimerRef.current = null;
+      }
+    };
+  }, []);
 
   React.useEffect(() => {
     if (intervalMs === 0) return;

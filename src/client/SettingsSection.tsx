@@ -226,7 +226,7 @@ export function SettingsSection({ t, ctx, days: injectedDays, totals: injectedTo
             >
               <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
                 <span style={{ fontSize: 14, fontWeight: 600, color: "var(--dsw-alias-label-primary)" }}>
-                  {lang === "en" ? "Heatmap Settings" : "热图设置"}
+                  {lang === "en" ? "Pulse Settings" : "Pulse 设置"}
                 </span>
                 <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
                   <button
@@ -291,7 +291,7 @@ export function SettingsSection({ t, ctx, days: injectedDays, totals: injectedTo
       ) : null}
 
       {totals ? <StatsCards t={lang === "en" ? (k:string,p?:any)=> { const enMap:Record<string,string>={"stats.today":"Today","stats.week":"This week","stats.month":"This month","stats.all":"All time"}; if(k==="stats.count") return `${p?.count ?? ""} turns`; return (enMap as any)[k] ?? t(k,p); } : t} totals={totals} todayCount={undefined} /> : null}
-      {days ? <HeatmapGrid t={lang === "en" ? (k:string,p?:any)=> { const enM:Record<string,string>={"view.week":"Week","view.month":"Month","view.quarter":"Quarter","view.year":"Year","heatmap.legend.less":"Less","heatmap.legend.more":"More","heatmap.empty":"No data yet","heatmap.tooltip.none":"No usage","heatmap.subtitle":"Token usage from local session logs, bucketed by Asia/Shanghai. First sync is persisted — deleting sessions keeps history.","heatmap.title":"Token Heatmap"}; return (enM as any)[k] ?? t(k,p); } : t} days={days} view={view} onViewChange={handleViewChange} selectedKey={selectedKey} onSelect={handleSelect} isEn={lang === "en"} thresholds={thresholds} /> : null}
+      {days ? <HeatmapGrid t={lang === "en" ? (k:string,p?:any)=> { const enM:Record<string,string>={"view.week":"Week","view.month":"Month","view.quarter":"Quarter","view.year":"Year","heatmap.legend.less":"Less","heatmap.legend.more":"More","heatmap.empty":"No data yet","heatmap.tooltip.none":"No usage","heatmap.subtitle":"Token usage from local session logs, bucketed by Asia/Shanghai. First sync is persisted — deleting sessions keeps history.","heatmap.title":"Token Pulse"}; return (enM as any)[k] ?? t(k,p); } : t} days={days} view={view} onViewChange={handleViewChange} selectedKey={selectedKey} onSelect={handleSelect} isEn={lang === "en"} thresholds={thresholds} /> : null}
       {selectedKey ? (
         <div style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 12, color: "var(--dsw-alias-label-secondary)" }}>
           <span>{tt("heatmap.dayDetail")}</span>

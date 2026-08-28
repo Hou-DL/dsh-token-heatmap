@@ -29,13 +29,14 @@ function injectNavCss() {
 function markNavRow() {
   if (typeof document === "undefined") return;
   const nav = t_global();
-  // Find settings nav buttons by text
-  const labels = ["Token Heatmap", "用量热图"];
+  // Match by the plugin's own label so future copy changes need only one edit.
+  // Legacy strings kept as belt-and-suspenders fallbacks for the icon injection.
+  const dynamic = typeof nav === "function" ? nav("nav") : "";
+  const labels = [dynamic, "Token Pulse", "Token Heatmap", "用量热图"].filter(Boolean);
   for (const label of labels) {
     const btn = [...document.querySelectorAll('button')].find((b) => b.textContent?.trim().includes(label));
     if (btn) btn.setAttribute("data-dsh-token-pulse-nav", "");
   }
-  void nav;
 }
 
 let t_global: () => any = () => (k: string) => k;

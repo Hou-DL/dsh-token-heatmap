@@ -43,11 +43,18 @@ export class HeatmapStore {
    * under- or over-counts.
    */
   async refresh(): Promise<void> {
-    const live = await readLiveUsageEvents(this.ctx);
-    const liveSids = new Set(live.map((e) => e.sid).filter(Boolean) as string[]);
-    this.events = [...this.events.filter((e) => !liveSids.has(e.sid)), ...live];
-    this.persistedDays = loadPersisted();
-    this.rebuildPersistedAndAggregated();
+    try {
+      const live = await readLiveUsageEvents(this.ctx);
+      const liveSids = new Set(live.map((e) => e.sid).filter(Boolean) as string[]);
+      this.events = [...this.events.filter((e) => !liveSids.has(e.sid)), ...live];
+      this.persistedDays = loadPersisted();
+      this.rebuildPersistedAndAggregated();
+    } catch (e: unknown) {
+      // B2 fix: a refresh failure must never leave the UI stuck "Refreshing" or
+      // wipe data — keep the last good snapshot and just log. The client's
+      // `finally` clears the spinner once this promise resolves normally.
+      this.ctx?.logger?.warn?.(`dsh-token-pulse refresh failed: ${String(e)}`);
+    }
   }
 
   private rebuildPersistedAndAggregated() {
@@ -88,6 +95,10 @@ export class HeatmapStore {
   private cachedAgg: Aggregated | null = null;
   private cachedAt = 0;
   private static CACHE_TTL_MS = 30_000;
+  // B1 fix: bound per-session provider/model fallbacks (the "" global entry is
+  // never evicted). Without a cap this Map grew for every new sid, slowly in an
+  // always-on host.
+  private static MAX_FALLBACK_SIDS = 2000;
 
   getAggregated(): Aggregated {
     // Before init() completes (disk scan + multi-frame zstd decode), return an
@@ -128,6 +139,16 @@ export class HeatmapStore {
       if (provider) cur.provider = provider;
       if (model) cur.model = model;
       this.fallbackBySid.set(sid, cur);
+      // B1 fix: FIFO-evict per-session fallback entries when the map exceeds the
+      // cap; keep the "" global entry so pre-header chunks still resolve. Map
+      // iterates in insertion order, so oldest sessions get recycled first.
+      if (this.fallbackBySid.size > HeatmapStore.MAX_FALLBACK_SIDS) {
+        for (const k of this.fallbackBySid.keys()) {
+          if (k === "") continue;
+          this.fallbackBySid.delete(k);
+          if (this.fallbackBySid.size <= HeatmapStore.MAX_FALLBACK_SIDS - 100) break;
+        }
+      }
     };
     if (event.type === "request/header" && event.data?.header?.config) {
       const cfg = event.data.header.config;
