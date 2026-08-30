@@ -90,11 +90,12 @@ async function fetchFromApi(): Promise<Aggregated | null> {
 }
 
 // Module-level cache that survives SettingsSection remounts (opening the card
-// again unmounts/remounts the component, which used to reset state to null and
-// re-fetch — causing a blank flash on every open). Reopening now renders the
-// cached snapshot immediately; a real fetch only happens on the refresh button,
-// the auto-refresh interval, or the very first open when nothing is cached yet.
-let _cache: { agg: Aggregated; label: string } | null = null;
+// again unmounts/remounts the component). Reopening renders the cached snapshot
+// immediately (no blank flash); a real fetch happens on the refresh button, on
+// the auto-refresh interval while mounted, or on (re)mount when the cache is
+// older than the configured interval — so toggling the panel open/closed still
+// picks up fresh data once the interval has elapsed.
+let _cache: { agg: Aggregated; label: string; at: number } | null = null;
 
 export function useHeatmapData(ctx: any | null, refreshMs?: number, manualTick?: number) {
   const [data, setData] = React.useState<Aggregated | null>(() => _cache?.agg ?? null);
@@ -116,7 +117,7 @@ export function useHeatmapData(ctx: any | null, refreshMs?: number, manualTick?:
     setRefreshing(true);
     const commit = (agg: Aggregated) => {
       const label = new Date().toLocaleString();
-      _cache = { agg, label };
+      _cache = { agg, label, at: Date.now() };
       setData(agg);
       setLastRefresh(label);
     };
@@ -159,13 +160,16 @@ export function useHeatmapData(ctx: any | null, refreshMs?: number, manualTick?:
     if (!_cache) setData((prev) => prev ?? aggregate([], Date.now()));
   }, [ctx]);
 
-  // Fetch policy: only pull on mount when nothing is cached yet (first ever
-  // open). Any later `manualTick` change (refresh button / interval change /
-  // reset) triggers a fetch. Reopening with a warm cache shows it instantly.
+  // Fetch policy: on first mount fetch when nothing is cached OR the cached
+  // snapshot is older than the configured interval (so reopening the panel
+  // after the interval elapses still refreshes — the setInterval alone wouldn't,
+  // because it resets on every remount). If auto-refresh is off (intervalMs 0),
+  // only fetch on a cold cache. Any later `manualTick` change forces a fetch.
   React.useEffect(() => {
     if (!mountedRef.current) {
       mountedRef.current = true;
-      if (!_cache) void fetchData();
+      const stale = !_cache || (intervalMs > 0 && Date.now() - _cache.at >= intervalMs);
+      if (stale) void fetchData();
       return;
     }
     void fetchData();
