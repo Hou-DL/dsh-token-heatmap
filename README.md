@@ -13,7 +13,10 @@
 
 
 ```bash
-# 从 GitHub
+# 从 npm（推荐，最短）
+dsh plugin --profile web add dsh-token-pulse
+
+# 或从 GitHub
 dsh plugin --profile web add github:Hou-DL/dsh-token-pulse
 
 # 或从 Gitee（国内访问更快）

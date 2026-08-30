@@ -13,7 +13,10 @@ A local Token usage heatmap plugin for DSH Web — GitHub-style calendar views, 
 
 
 ```bash
-# From GitHub
+# From npm (recommended, shortest)
+dsh plugin --profile web add dsh-token-pulse
+
+# Or from GitHub
 dsh plugin --profile web add github:Hou-DL/dsh-token-pulse
 
 # Or from Gitee (faster in China)

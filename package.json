@@ -1,6 +1,6 @@
 {
   "name": "dsh-token-pulse",
-  "version": "0.2.2-beta",
+  "version": "0.3.0",
   "type": "module",
   "description": "设置内独立栏的本地 Token 热图：周/月/季度/年视图 + 日周月总统计 + 按模型/供应商 Top5",
   "repository": {
